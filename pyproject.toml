@@ -1,0 +1,45 @@
+[build-system]
+requires = [
+    "setuptools >= 61",
+    "wheel",
+    "panda3d-pman"
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "game"
+version = "0.1.0"
+dependencies = [
+    "panda3d ~= 1.10.0",
+    "panda3d-pman",
+]
+requires-python = ">= 3.11"
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pylint ~= 2.17.0",
+    "pytest-pylint",
+    "types-panda3d",
+]
+
+[tool.pylint.main]
+jobs = 0
+
+[tool.pylint."message control"]
+disable = [
+    "r",
+    "missing-docstring",
+]
+
+[tool.pylint.basic]
+good-names = "dt, _"
+
+[tool.pytest.ini_options]
+addopts = "--pylint"
+
+[tool.pman.build_apps]
+plugins = [
+    "pandagl",
+    "p3openal_audio",
+]
