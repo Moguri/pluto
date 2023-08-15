@@ -9,9 +9,10 @@ from direct.showbase.DirectObject import DirectObject
 from direct.showbase.ShowBase import ShowBase
 
 
-class GameState(DirectObject):
+class GameState:
     def __init__(self, base):
         super().__init__()
+        self.events: DirectObject = DirectObject()
         self.root_node: p3d.NodePath[p3d.PandaNode] | None = p3d.NodePath('State Root')
         self.root_node2d: p3d.NodePath[p3d.PandaNode] | None = p3d.NodePath('State Root 2D')
 
@@ -26,7 +27,7 @@ class GameState(DirectObject):
             base.taskMgr.do_method_later(0, handle_fade, 'Fade In')
 
     def cleanup(self):
-        self.ignoreAll()
+        self.events.ignoreAll()
         if self.root_node:
             self.root_node.remove_node()
             self.root_node = None
