@@ -41,6 +41,7 @@ def load_level(levelname: str) -> Level:
 @dataclass(kw_only=True)
 class CameraController:
     cam_node: p3d.NodePath
+    target: p3d.NodePath
     angle: int
     distance: int
 
@@ -49,7 +50,9 @@ class CameraController:
         camy = math.cos(rad) * self.distance
         camz = math.sin(rad) * self.distance
         self.cam_node.set_hpr(0, -self.angle, 0)
-        self.cam_node.set_pos(0, -camy, camz)
+
+        campos = self.target.get_pos() + p3d.Vec3(0, -camy, camz)
+        self.cam_node.set_pos(campos)
 
 
 @dataclass(kw_only=True)
@@ -137,6 +140,8 @@ class Main(GameState):
         props.set_mouse_mode(p3d.WindowProperties.M_confined)
         self.window.request_properties(props)
 
+        base.camLens.set_fov(70)
+
 
         self.cursor = CursorInput(
             mouse_watcher=base.mouseWatcherNode,
@@ -144,15 +149,16 @@ class Main(GameState):
             root_node=self.root_node,
         )
         self.cam_contr = CameraController(
-            cam_node=base.cam,
+            cam_node=base.camera,
+            target=player_node,
             angle=45,
-            distance=40,
+            distance=25,
         )
         self.player_contr = PlayerController(
             events=self.events,
             player_node=player_node,
             cursor=self.cursor,
-            speed=10,
+            speed=25,
         )
 
     def cleanup(self):
