@@ -1,6 +1,10 @@
 import math
 from dataclasses import dataclass, field
 
+from typing import (
+    Self,
+)
+
 import panda3d.core as p3d
 from direct.showbase.ShowBase import ShowBase
 from direct.showbase.DirectObject import DirectObject
@@ -10,32 +14,22 @@ from lib.gamestates import GameState
 
 @dataclass(kw_only=True)
 class Level:
-    name: str
     root: p3d.NodePath
     player_starts: list[p3d.Vec3]
 
+    @classmethod
+    def create(cls, model: p3d.NodePath) -> Self:
+        player_starts = [
+            i.parent.get_pos()
+            for i in model.find_all_matches('**/=type=player_start')
+        ]
 
-def load_level(levelname: str) -> Level:
-    leveldir = p3d.Filename('levels')
-    levelpath = leveldir / levelname
-    levelpath.set_extension('bam')
+        level = cls(
+            root=model,
+            player_starts=player_starts
+        )
 
-    loader = p3d.Loader.get_global_ptr()
-    modelroot = loader.load_sync(levelpath)
-    root = p3d.NodePath(modelroot)
-
-    player_starts = [
-        i.parent.get_pos()
-        for i in root.find_all_matches('**/=type=player_start')
-    ]
-
-    level = Level(
-        name=levelname,
-        root=root,
-        player_starts=player_starts
-    )
-
-    return level
+        return level
 
 
 @dataclass(kw_only=True)
@@ -121,17 +115,17 @@ class PlayerController:
 
 
 class Main(GameState):
+    RESOURCES = {
+        'level': 'levels/testenv.bam',
+        'player': 'skeleton.bam',
+    }
+
     def __init__(self, base: ShowBase):
         super().__init__(base)
 
-        loader = p3d.Loader.get_global_ptr()
-        self.level = load_level('testenv')
-        self.level.root.reparent_to(self.root_node)
+        self.level = None
 
-        player_model = loader.load_sync('skeleton.bam')
-        player_node = p3d.NodePath(player_model)
-        player_node.reparent_to(self.level.root)
-        player_node.set_pos(self.level.player_starts[0])
+        self.player_node = self.root_node.attach_new_node('Player')
 
         # Set confined mouse mode
         self.window = base.win
@@ -150,16 +144,24 @@ class Main(GameState):
         )
         self.cam_contr = CameraController(
             cam_node=base.camera,
-            target=player_node,
+            target=self.player_node,
             angle=45,
             distance=25,
         )
         self.player_contr = PlayerController(
             events=self.events,
-            player_node=player_node,
+            player_node=self.player_node,
             cursor=self.cursor,
             speed=25,
         )
+
+    def start(self):
+        self.level = Level.create(self.resources['level'])
+        self.level.root.reparent_to(self.root_node)
+
+        player_model = self.resources['player']
+        player_model.reparent_to(self.player_node)
+
 
     def cleanup(self):
         super().cleanup()
