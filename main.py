@@ -18,8 +18,8 @@ p3d.load_prc_file_data(
     'win-fixed-size true\n'
     'win-size 1280 720\n'
     'event-map-item-quit escape q\n'
-    'event-map-item-move-forward raw-w\n'
-    'event-map-item-move-backward raw-s\n'
+    'event-map-item-move-up raw-w\n'
+    'event-map-item-move-down raw-s\n'
     'event-map-item-move-left raw-a\n'
     'event-map-item-move-right raw-d\n'
 )
