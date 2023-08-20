@@ -11,7 +11,7 @@ from direct.task.TaskManagerGlobal import taskMgr as task_mgr
 
 
 class GameState:
-    def __init__(self, base):
+    def __init__(self, base) -> None:
         super().__init__()
         self.events: DirectObject = DirectObject()
         self.root_node: p3d.NodePath[p3d.PandaNode] | None = p3d.NodePath('State Root')
@@ -22,7 +22,7 @@ class GameState:
             self.root_node.reparent_to(base.render)
             self.root_node2d.reparent_to(base.render2d)
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         self.events.ignoreAll()
         if self.root_node:
             self.root_node.remove_node()
@@ -31,16 +31,16 @@ class GameState:
             self.root_node2d.remove_node()
             self.root_node2d = None
 
-    async def load(self, loader):
+    async def load(self, loader) -> None:
         resources = getattr(self.__class__, 'RESOURCES', {})
 
         for name, filepath in resources.items():
             self.resources[name] = await loader.load_model(filepath, blocking=False)
 
-    def start(self):
+    def start(self) -> None:
         pass
 
-    def update(self, _dt: float):
+    def update(self, _dt: float) -> None:
         pass
 
 
