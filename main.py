@@ -107,8 +107,10 @@ class GameApp(ShowBase):
         self.disable_mouse()
 
         self.network = NetworkManager(net_role=NetRole.DUAL)
-        self.network.register_message_type(PlayerInputMsg)
-        self.network.register_message_type(PlayerUpdateMsg)
+        self.network.register_message_types(
+            PlayerInputMsg,
+            PlayerUpdateMsg,
+        )
 
         self.gamestates = NetworkGameStateManager(
             self,

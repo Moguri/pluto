@@ -1,13 +1,13 @@
 import panda3d.core as p3d
 
-from lib.networking import network_message
+from lib.networking import NetworkMessage
 
-@network_message
-class PlayerInputMsg:
+
+class PlayerInputMsg(NetworkMessage):
     move_dir: p3d.Vec2
     aim_pos: p3d.Vec3
 
-@network_message
-class PlayerUpdateMsg:
+
+class PlayerUpdateMsg(NetworkMessage):
     position: p3d.Vec3
     hpr: p3d.Vec3

@@ -13,6 +13,7 @@ dependencies = [
     "panda3d ~= 1.10.0",
     "panda3d-pman",
     "panda3d-eventmapper",
+    "msgspec ~= 0.18.0",
 ]
 requires-python = ">= 3.11"
 

@@ -8,8 +8,7 @@ class RepData:
     intval: int = networking.repfield(default=5)
 
 
-@networking.network_message
-class TestNetMsg:
+class NetMsg(networking.NetworkMessage):
     data: str
 
 
@@ -61,24 +60,24 @@ def test_networking_manager_setup():
 def test_networking_manager_register_types():
     manager = networking.NetworkManager(net_role=networking.NetRole.DUAL)
 
-    manager.register_message_type(TestNetMsg)
+    manager.register_message_types(NetMsg)
 
     with pytest.raises(RuntimeError):
-        manager.register_message_type(TestNetMsg)
+        manager.register_message_types(NetMsg)
 
 def test_networking_manager_send():
     manager = networking.NetworkManager(net_role=networking.NetRole.DUAL)
 
     msgstr = 'Hello World'
-    msg = TestNetMsg(data=msgstr)
+    msg = NetMsg(data=msgstr)
 
     with pytest.raises(RuntimeError):
         manager.send(msg, networking.NetRole.CLIENT)
 
-    manager.register_message_type(TestNetMsg)
+    manager.register_message_types(NetMsg)
     manager.send(msg, networking.NetRole.CLIENT)
 
     messages = manager.get_messages(networking.NetRole.SERVER)
     assert messages
-    assert isinstance(messages[0], TestNetMsg)
+    assert isinstance(messages[0], NetMsg)
     assert messages[0].data == msgstr

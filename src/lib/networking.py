@@ -5,14 +5,11 @@ from dataclasses import (
     InitVar,
 )
 from enum import Enum
+import struct
 from typing import (
     Any,
     ClassVar,
-    Protocol,
-    Self,
 )
-
-import panda3d.core as p3d
 
 from .networking_transport import (
     NetworkTransport,
@@ -20,17 +17,11 @@ from .networking_transport import (
 )
 from .networking_serializers import (
     NetworkSerializer,
-    JsonNetworkSerializer,
+    MsgspecNetworkSerializer,
 )
-
-
-# mostly alias for now, we might need to expand on this later
-network_message = dataclass(kw_only=True)
-
-
-class NetworkMessage(Protocol):
-    @classmethod
-    def from_dict(cls, data) -> Self: ...
+from .networking_message import ( # pylint: disable=unused-import
+    NetworkMessage,
+)
 
 
 class NetRole(Enum):
@@ -67,7 +58,7 @@ def get_replicated_fields(replicatable_object: Any):
 class NetworkManager:
     net_role: NetRole
     transport_type: InitVar[ClassVar[NetworkTransport]] = PandaNetworkTransport
-    serializer: NetworkSerializer = field(default_factory=JsonNetworkSerializer)
+    serializer: NetworkSerializer = field(default_factory=MsgspecNetworkSerializer)
     host: str = 'localhost'
     port: int = 8080
 
@@ -98,21 +89,23 @@ class NetworkManager:
 
         self.update()
 
-    def register_message_type(self, message_type: ClassVar[NetworkMessage]) -> None:
-        try:
-            self._message_types.index(message_type)
-            raise RuntimeError(
-                f'Cannot register NetworkMessage type {message_type}: already registered'
-            )
-        except ValueError:
-            pass
+    def register_message_types(self, *message_types: ClassVar[NetworkMessage]) -> None:
+        for message_type in message_types:
+            try:
+                self._message_types.index(message_type)
+                raise RuntimeError(
+                    f'Cannot register NetworkMessage type {message_type}: already registered'
+                )
+            except ValueError:
+                pass
 
-        if not dataclasses.is_dataclass(message_type):
-            raise RuntimeError(
-                f'Cannot serialize message of type {message_type}: must be a dataclass'
-            )
+            if not issubclass(message_type, NetworkMessage):
+                raise RuntimeError(
+                    f'Cannot register NetworkMessage type {message_type}: '
+                    'must be a subclass of NetworkMessage'
+                )
 
-        self._message_types.append(message_type)
+            self._message_types.append(message_type)
 
     def update(self) -> None:
         if self._server_transport:
@@ -130,33 +123,16 @@ class NetworkManager:
                 f'Attempted to send message of unregistered type: {msgtype}'
             ) from exc
 
-        msgdict = dataclasses.asdict(message)
-        for key, value in msgdict.items():
-            match value:
-                case p3d.LVecBase2():
-                    msgdict[key] = (value.x, value.y)
-                case p3d.LVecBase3():
-                    msgdict[key] = (value.x, value.y, value.z)
-                case p3d.LVecBase4():
-                    msgdict[key] = (value.x, value.y, value.z, value.w)
-        msgdict['__typeid__'] = type_id
-        return self.serializer.serialize(msgdict)
+        msgbytes = self.serializer.serialize(message)
+        return struct.pack('!B', type_id) + msgbytes
 
     def _deserialize_net_msg(self, message: bytes) -> NetworkMessage:
-        msgdict = self.serializer.deserialize(message)
-        type_id = msgdict['__typeid__']
-        del msgdict['__typeid__']
+        type_id = struct.unpack_from('!B', message)[0]
         msgtype = self._message_types[type_id]
 
-        for key, value in msgdict.items():
-            vtype = msgtype.__annotations__[key]
-            if issubclass(vtype, p3d.LVecBase2 | p3d.LVecBase3 | p3d.LVecBase4):
-                msgdict[key] = vtype(*value)
-
-        if hasattr(msgtype, 'from_dict'):
-            return msgtype.from_dict(msgdict)
-
-        return msgtype(**msgdict)
+        msgbytes = message[struct.calcsize('!B'):]
+        msgobj = self.serializer.deserialize(msgbytes, msgtype)
+        return msgobj
 
     def _transport_from_netrole(self, netrole: NetRole = NetRole):
         if self.net_role == NetRole.DUAL and netrole == NetRole.DUAL:
