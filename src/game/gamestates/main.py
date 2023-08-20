@@ -188,8 +188,8 @@ class MainClient(GameState):
             match msg:
                 case PlayerUpdateMsg():
                     self.player_node.set_pos_hpr(
-                        *msg.position,
-                        *msg.hpr
+                        msg.position,
+                        msg.hpr
                     )
                 case _:
                     print(f'Unknown message type: {type(msg)}')
@@ -200,15 +200,8 @@ class MainClient(GameState):
         self.cam_contr.update(dt)
 
         player_update = PlayerInputMsg(
-            move_dir=(
-                self.player_input.move_dir.x,
-                self.player_input.move_dir.y
-            ),
-            aim_pos=(
-                self.player_input.aim_pos.x,
-                self.player_input.aim_pos.y,
-                self.player_input.aim_pos.z
-            )
+            move_dir=self.player_input.move_dir,
+            aim_pos=self.player_input.aim_pos
         )
         self.network.send(player_update, NetRole.CLIENT)
 
@@ -238,26 +231,16 @@ class MainServer(GameState):
         for msg in messages:
             match msg:
                 case PlayerInputMsg():
-                    self.player_contr.move_dir = p3d.Vec2(*msg.move_dir)
-                    self.player_contr.aim_pos = p3d.Vec3(*msg.aim_pos)
+                    self.player_contr.move_dir = msg.move_dir
+                    self.player_contr.aim_pos = msg.aim_pos
                 case _:
                     print(f'Unknown message type: {type(msg)}')
 
     def update(self, dt: float) -> None:
         self.player_contr.update(dt)
 
-        player_pos = self.player_contr.player_node.get_pos()
-        player_hpr = self.player_contr.player_node.get_hpr()
         player_update = PlayerUpdateMsg(
-            position=(
-                player_pos.x,
-                player_pos.y,
-                player_pos.z
-            ),
-            hpr=(
-                player_hpr.x,
-                player_hpr.y,
-                player_hpr.z
-            )
+            position=self.player_contr.player_node.get_pos(),
+            hpr=self.player_contr.player_node.get_hpr()
         )
         self.network.send(player_update, NetRole.SERVER)

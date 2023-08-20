@@ -1,17 +1,13 @@
-from typing import (
-    TypeAlias,
-)
-from lib.networking import network_message
+import panda3d.core as p3d
 
-NetVec2: TypeAlias = tuple[float, float]
-NetVec3: TypeAlias = tuple[float, float, float]
+from lib.networking import network_message
 
 @network_message
 class PlayerInputMsg:
-    move_dir: NetVec2
-    aim_pos: NetVec3
+    move_dir: p3d.Vec2
+    aim_pos: p3d.Vec3
 
 @network_message
 class PlayerUpdateMsg:
-    position: NetVec3
-    hpr: NetVec3
+    position: p3d.Vec3
+    hpr: p3d.Vec3

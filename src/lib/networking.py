@@ -4,9 +4,7 @@ from dataclasses import (
     field,
     InitVar,
 )
-
 from enum import Enum
-import json
 from typing import (
     Any,
     ClassVar,
@@ -14,11 +12,25 @@ from typing import (
     Self,
 )
 
+import panda3d.core as p3d
 
 from .networking_transport import (
     NetworkTransport,
     PandaNetworkTransport,
 )
+from .networking_serializers import (
+    NetworkSerializer,
+    JsonNetworkSerializer,
+)
+
+
+# mostly alias for now, we might need to expand on this later
+network_message = dataclass(kw_only=True)
+
+
+class NetworkMessage(Protocol):
+    @classmethod
+    def from_dict(cls, data) -> Self: ...
 
 
 class NetRole(Enum):
@@ -51,19 +63,11 @@ def get_replicated_fields(replicatable_object: Any):
     ]
 
 
-# alias for now, we might need to expand on this later
-network_message = dataclass(kw_only=True)
-
-
-class NetworkMessage(Protocol):
-    @classmethod
-    def from_dict(cls, data) -> Self: ...
-
-
 @dataclasses.dataclass(kw_only=True)
 class NetworkManager:
     net_role: NetRole
     transport_type: InitVar[ClassVar[NetworkTransport]] = PandaNetworkTransport
+    serializer: NetworkSerializer = field(default_factory=JsonNetworkSerializer)
     host: str = 'localhost'
     port: int = 8080
 
@@ -127,16 +131,27 @@ class NetworkManager:
             ) from exc
 
         msgdict = dataclasses.asdict(message)
+        for key, value in msgdict.items():
+            match value:
+                case p3d.LVecBase2():
+                    msgdict[key] = (value.x, value.y)
+                case p3d.LVecBase3():
+                    msgdict[key] = (value.x, value.y, value.z)
+                case p3d.LVecBase4():
+                    msgdict[key] = (value.x, value.y, value.z, value.w)
         msgdict['__typeid__'] = type_id
-        msgstr = json.dumps(msgdict)
-        msgbytes = msgstr.encode('utf8')
-        return msgbytes
+        return self.serializer.serialize(msgdict)
 
     def _deserialize_net_msg(self, message: bytes) -> NetworkMessage:
-        msgdict = json.loads(message)
+        msgdict = self.serializer.deserialize(message)
         type_id = msgdict['__typeid__']
         del msgdict['__typeid__']
         msgtype = self._message_types[type_id]
+
+        for key, value in msgdict.items():
+            vtype = msgtype.__annotations__[key]
+            if issubclass(vtype, p3d.LVecBase2 | p3d.LVecBase3 | p3d.LVecBase4):
+                msgdict[key] = vtype(*value)
 
         if hasattr(msgtype, 'from_dict'):
             return msgtype.from_dict(msgdict)
