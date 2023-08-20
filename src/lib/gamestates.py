@@ -48,20 +48,19 @@ StatesDict: TypeAlias = Mapping[str, type[GameState]]
 
 
 class GameStateManager:
-    def __init__(self, showbase: ShowBase | None, states: StatesDict, initial_state_name: str):
+    def __init__(self, showbase: ShowBase | None, states: StatesDict):
         self.current_state: GameState | None = None
         self.previous_state_name: str = ''
         self.current_state_name: str = ''
         self.states = states
         self.base = showbase
         self.task_mgr = task_mgr
-        self.change(initial_state_name)
 
     def update(self, dt: float):
         if self.current_state:
             self.current_state.update(dt)
 
-    def change(self, state_name: str):
+    def change(self, state_name: str, *args, **kwargs):
         if state_name not in self.states:
             raise RuntimeError(f'Unknown state name: {state_name}')
         if self.current_state is None:
@@ -73,7 +72,7 @@ class GameStateManager:
             self.current_state.cleanup()
         self.current_state_name = state_name
 
-        self.current_state = self.states[state_name](self.base)
+        self.current_state = self.states[state_name](self.base, *args, **kwargs)
 
         async def load_state(task):
             if self.base and not self.base.transitions.fadeOutActive():

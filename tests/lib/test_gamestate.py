@@ -4,4 +4,5 @@ class TestState(gamestates.GameState):
     pass
 
 def test_gamesate_basic():
-    gamestates.GameStateManager(None, {'test': TestState}, 'test')
+    gsm = gamestates.GameStateManager(None, {'test': TestState})
+    gsm.change('test')
