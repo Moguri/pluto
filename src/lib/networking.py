@@ -21,6 +21,9 @@ from .networking_serializers import (
 )
 from .networking_message import ( # pylint: disable=unused-import
     NetworkMessage,
+    Vec2H,
+    Vec3H,
+    Vec4H,
 )
 
 
