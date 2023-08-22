@@ -55,9 +55,10 @@ class GameStateManager:
         self.states = states
         self.base = showbase
         self.task_mgr = task_mgr
+        self.load_complete = False
 
     def update(self, dt: float):
-        if self.current_state:
+        if self.current_state and self.load_complete:
             self.current_state.update(dt)
 
     def change(self, state_name: str, *args, **kwargs):
@@ -75,12 +76,14 @@ class GameStateManager:
         self.current_state = self.states[state_name](self.base, *args, **kwargs)
 
         async def load_state(task):
+            self.load_complete = False
             if self.base and not self.base.transitions.fadeOutActive():
                 await self.base.transitions.fadeOut()
             await self.current_state.load(self.base.loader)
             self.current_state.start()
             if self.base:
                 self.base.transitions.fadeIn()
+            self.load_complete = True
 
             return task.done
         self.task_mgr.add(load_state)

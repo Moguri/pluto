@@ -65,6 +65,8 @@ class NetworkGameStateManager:
             self.server_gsm = GameStateManager(showbase, server_states)
 
     def _handle_messages(self, gsm: GameStateManager, netrole: NetRole):
+        if not gsm.load_complete:
+            return
         msgfunc = getattr(gsm.current_state, 'handle_messages', None)
         if msgfunc:
             msgfunc(self.network.get_messages(netrole))
