@@ -19,10 +19,7 @@ from lib.networking import (
 )
 
 from game import gamestates
-from game.network_messages import (
-    PlayerInputMsg,
-    PlayerUpdateMsg,
-)
+import game.network_messages
 
 
 p3d.load_prc_file_data(
@@ -107,10 +104,7 @@ class GameApp(ShowBase):
         self.disable_mouse()
 
         self.network = NetworkManager(net_role=NetRole.DUAL)
-        self.network.register_message_types(
-            PlayerInputMsg,
-            PlayerUpdateMsg,
-        )
+        self.network.register_message_module(game.network_messages)
 
         self.gamestates = NetworkGameStateManager(
             self,

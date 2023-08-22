@@ -5,6 +5,7 @@ from dataclasses import (
     InitVar,
 )
 from enum import Enum
+import inspect
 import struct
 from typing import (
     Any,
@@ -109,6 +110,14 @@ class NetworkManager:
                 )
 
             self._message_types.append(message_type)
+
+    def register_message_module(self, module: Any) -> None:
+        msgtypes = [
+            clsobj
+            for _, clsobj in inspect.getmembers(module, inspect.isclass)
+            if issubclass(clsobj, NetworkMessage)
+        ]
+        self.register_message_types(*msgtypes)
 
     def update(self) -> None:
         if self._server_transport:
