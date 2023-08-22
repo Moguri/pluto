@@ -17,6 +17,7 @@ from lib.networking import (
 from game.network_messages import (
     PlayerInputMsg,
     PlayerUpdateMsg,
+    RegisterPlayerIdMsg,
 )
 
 
@@ -112,7 +113,7 @@ class PlayerInput:
 
 @dataclass(kw_only=True)
 class PlayerController:
-    speed: int
+    speed: int = 25
     player_node: p3d.NodePath
     move_dir: p3d.Vec2 = field(init=False, default_factory=p3d.Vec2)
     aim_pos: p3d.Vec3 = field(init=False, default_factory=p3d.Vec3)
@@ -153,7 +154,9 @@ class MainClient(GameState):
         base.camLens.set_fov(70)
 
 
-        self.player_node = self.root_node.attach_new_node('Player')
+        self.camera_target = self.root_node.attach_new_node('Camera Target')
+        self.playerid = None
+        self.player_nodes = {}
         self.cursor = CursorInput(
             mouse_watcher=base.mouseWatcherNode,
             camera_node=base.cam,
@@ -165,7 +168,7 @@ class MainClient(GameState):
         )
         self.cam_contr = CameraController(
             cam_node=base.camera,
-            target=self.player_node,
+            target=self.camera_target,
             angle=45,
             distance=25,
         )
@@ -174,20 +177,27 @@ class MainClient(GameState):
         self.level = Level.create(self.resources['level'])
         self.level.root.reparent_to(self.root_node)
 
-        player_model = self.resources['player']
-        player_model.reparent_to(self.player_node)
-
-
     def cleanup(self):
         super().cleanup()
 
         self.window.request_properties(self.prev_win_props)
 
+    def add_new_player(self, playerid):
+        player_node = self.root_node.attach_new_node(f'Player {playerid}')
+        self.resources['player'].instance_to(player_node)
+
+        self.player_nodes[playerid] = player_node
+
     def handle_messages(self, messages):
         for msg in messages:
             match msg:
+                case RegisterPlayerIdMsg():
+                    self.playerid = msg.playerid
                 case PlayerUpdateMsg():
-                    self.player_node.set_pos_hpr(
+                    playerid = msg.playerid
+                    if playerid not in self.player_nodes:
+                        self.add_new_player(playerid)
+                    self.player_nodes[playerid].set_pos_hpr(
                         msg.position,
                         msg.hpr
                     )
@@ -195,6 +205,8 @@ class MainClient(GameState):
                     print(f'Unknown message type: {type(msg)}')
 
     def update(self, dt: float):
+        if self.playerid is not None and self.playerid in self.player_nodes:
+            self.camera_target.set_pos(self.player_nodes[self.playerid].get_pos())
         self.cursor.update()
         self.player_input.update()
         self.cam_contr.update(dt)
@@ -217,30 +229,46 @@ class MainServer(GameState):
         self.network = network
         self.level = None
 
-        self.player_node = self.root_node.attach_new_node('Player')
-        self.player_contr = PlayerController(
-            player_node=self.player_node,
-            speed=25,
-        )
+        self.player_contrs = {}
+        self.player_nodes = {}
 
     def start(self) -> None:
         self.level = Level.create(self.resources['level'])
         self.level.root.reparent_to(self.root_node)
 
+
+    def add_new_player(self, connid):
+        playerid = connid
+
+        self.player_nodes[playerid] = self.root_node.attach_new_node(f'Player {playerid}')
+        self.player_contrs[playerid] = PlayerController(
+            player_node=self.player_nodes[playerid]
+        )
+
+        register_player = RegisterPlayerIdMsg(playerid=playerid)
+        register_player.connection_id = connid
+        self.network.send(register_player, NetRole.SERVER)
+
     def handle_messages(self, messages) -> None:
         for msg in messages:
             match msg:
                 case PlayerInputMsg():
-                    self.player_contr.move_dir = msg.move_dir
-                    self.player_contr.aim_pos = msg.aim_pos
+                    playerid = msg.connection_id
+                    if playerid not in self.player_contrs:
+                        self.add_new_player(playerid)
+                    player_contr = self.player_contrs[playerid]
+                    player_contr.move_dir = msg.move_dir
+                    player_contr.aim_pos = msg.aim_pos
                 case _:
                     print(f'Unknown message type: {type(msg)}')
 
     def update(self, dt: float) -> None:
-        self.player_contr.update(dt)
+        for playerid, player_contr in self.player_contrs.items():
+            player_contr.update(dt)
 
-        player_update = PlayerUpdateMsg(
-            position=self.player_contr.player_node.get_pos(),
-            hpr=self.player_contr.player_node.get_hpr()
-        )
-        self.network.send(player_update, NetRole.SERVER)
+            player_update = PlayerUpdateMsg(
+                playerid=playerid,
+                position=player_contr.player_node.get_pos(),
+                hpr=player_contr.player_node.get_hpr()
+            )
+            self.network.send(player_update, NetRole.SERVER)
