@@ -77,11 +77,11 @@ class GameStateManager:
 
         async def load_state(task):
             self.load_complete = False
-            if self.base and not self.base.transitions.fadeOutActive():
+            if self.base and self.base.win and not self.base.transitions.fadeOutActive():
                 await self.base.transitions.fadeOut()
             await self.current_state.load(self.base.loader)
             self.current_state.start()
-            if self.base:
+            if self.base and self.base.win:
                 self.base.transitions.fadeIn()
             self.load_complete = True
 

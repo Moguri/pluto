@@ -49,8 +49,8 @@ class NetworkGameStateManager:
     client_states: InitVar[StatesDict]
     server_states: InitVar[StatesDict]
     network: NetworkManager
-    client_gsm: GameStateManager | None = field(init=False)
-    server_gsm: GameStateManager | None = field(init=False)
+    client_gsm: GameStateManager | None = field(init=False, default=None)
+    server_gsm: GameStateManager | None = field(init=False, default=None)
 
     def __post_init__(
             self,
@@ -74,6 +74,7 @@ class NetworkGameStateManager:
             print(f'{gsm.current_state.__class__.__name__} is missing handle_messages')
 
     def update(self, dt: float):
+        self.network.update()
         if self.client_gsm:
             self._handle_messages(self.client_gsm, NetRole.CLIENT)
             self.client_gsm.update(dt)
@@ -98,14 +99,30 @@ class NetworkGameStateManager:
 
 class GameApp(ShowBase):
     def __init__(self):
+        args = sys.argv[1:]
+        netopts = {
+            'net_role': NetRole.DUAL,
+        }
+        if len(args) > 0:
+            if args[0] == 'join':
+                netopts['net_role'] = NetRole.CLIENT
+            elif args[0] == 'host':
+                netopts['net_role'] = NetRole.SERVER
+                p3d.load_prc_file_data('offscreen window', 'window-type none')
+        if len(args) > 1:
+            netopts['host'] = args[1]
+        if len(args) > 2:
+            netopts['port'] = args[2]
+
         pman.shim.init(self)
         ShowBase.__init__(self)
 
-        simplepbr.init()
+        if netopts['net_role'] != NetRole.SERVER:
+            simplepbr.init()
 
         self.disable_mouse()
 
-        self.network = NetworkManager(net_role=NetRole.DUAL)
+        self.network = NetworkManager(**netopts)
         self.network.register_message_module(game.network_messages)
 
         self.gamestates = NetworkGameStateManager(
@@ -121,7 +138,6 @@ class GameApp(ShowBase):
 
         def update_states(task):
             clock = p3d.ClockObject.get_global_clock()
-            self.network.update()
             self.gamestates.update(clock.get_dt())
             return task.cont
 
