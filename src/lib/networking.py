@@ -138,12 +138,13 @@ class NetworkManager:
         msgbytes = self.serializer.serialize(message)
         return struct.pack('!B', type_id) + msgbytes
 
-    def _deserialize_net_msg(self, message: bytes) -> NetworkMessage:
+    def _deserialize_net_msg(self, connid: int, message: bytes) -> NetworkMessage:
         type_id = struct.unpack_from('!B', message)[0]
         msgtype = self._message_types[type_id]
 
         msgbytes = message[struct.calcsize('!B'):]
         msgobj = self.serializer.deserialize(msgbytes, msgtype)
+        msgobj.connection_id = connid
         return msgobj
 
     def _transport_from_netrole(self, netrole: NetRole = NetRole):
@@ -161,11 +162,11 @@ class NetworkManager:
 
     def send(self, message: NetworkMessage, netrole: NetRole = NetRole.DUAL):
         msgbytes = self._serialize_net_msg(message)
-        self._transport_from_netrole(netrole).send(msgbytes)
+        self._transport_from_netrole(netrole).send(msgbytes, message.connection_id)
 
     def get_messages(self, netrole: NetRole = NetRole.DUAL) -> list[NetworkMessage]:
         transport = self._transport_from_netrole(netrole)
         return [
-            self._deserialize_net_msg(msg)
-            for msg in transport.get_messages()
+            self._deserialize_net_msg(connid, msg)
+            for connid, msg in transport.get_messages()
         ]

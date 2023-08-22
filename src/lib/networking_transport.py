@@ -18,7 +18,7 @@ class NetworkTransport(Protocol):
     def start_server(self, port: int) -> None: ...
     def start_client(self, host: str, port: int) -> None: ...
     def update(self) -> None: ...
-    def get_messages(self) -> Iterable[bytes]: ...
+    def get_messages(self) -> Iterable[tuple[int, bytes]]: ...
     def send(self, message: bytes, connection_id: int | None = None) -> None: ...
 
 
@@ -77,7 +77,7 @@ class PandaNetworkTransport(NetworkTransport):
             self._connections.append(new_conn)
             self._reader.add_connection(new_conn)
 
-    def get_messages(self) -> Iterable[bytes]:
+    def get_messages(self) -> Iterable[tuple[int, bytes]]:
         if not self._reader:
             return []
 
@@ -86,7 +86,8 @@ class PandaNetworkTransport(NetworkTransport):
             datagram = p3d.NetDatagram()
             if self._reader.get_data(datagram):
                 msg = PyDatagramIterator(datagram)
-                messages.append(msg.get_blob())
+                connectionid = self._connections.index(datagram.get_connection())
+                messages.append((connectionid, msg.get_blob()))
 
         return messages
 
