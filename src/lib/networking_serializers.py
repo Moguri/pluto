@@ -3,10 +3,8 @@ import struct
 from typing import (
     Any,
     ClassVar,
-    Mapping,
     Protocol,
     Type,
-    TypeAlias,
 )
 
 import msgspec

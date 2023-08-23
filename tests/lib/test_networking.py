@@ -34,7 +34,7 @@ def test_networking_panda_transport_setup():
     # Check server received message
     msgs = server.get_messages()
     assert msgs
-    assert msgs[0] == msg
+    assert msgs[0][1] == msg
 
     # Send a message from server to client
     msg = b'foo'
@@ -43,7 +43,7 @@ def test_networking_panda_transport_setup():
     # Check client received message
     msgs = client.get_messages()
     assert msgs
-    assert msgs[0] == msg
+    assert msgs[0][1] == msg
 
 
 def test_networking_manager_setup():
