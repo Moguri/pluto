@@ -24,7 +24,7 @@ import game.network_messages
 
 p3d.load_prc_file_data(
     '',
-    'window-title Panda3D Game\n'
+    'window-title Pluto Game\n'
     'win-fixed-size true\n'
     'win-size 1280 720\n'
     'event-map-item-quit escape q\n'
