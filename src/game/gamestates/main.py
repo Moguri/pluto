@@ -38,7 +38,24 @@ class Level:
             player_starts=player_starts
         )
 
+        for caster in model.find_all_matches('**/=type=shadow_caster/+Light'):
+            caster.node().set_shadow_caster(True, 1024, 1024)
+            level.recalc_light_bounds(caster)
+
         return level
+
+    def recalc_light_bounds(self, lightnp: p3d.NodePath):
+        bounds = self.root.get_tight_bounds(lightnp)
+        light_lens = lightnp.node().get_lens()
+        if bounds:
+            bmin, bmax = bounds
+            light_lens.set_film_offset((bmin.xz + bmax.xz) * 0.5)
+            light_lens.set_film_size(bmax.xz - bmin.xz)
+            light_lens.set_near_far(bmin.y, bmax.y)
+        else:
+            self.root.ls()
+            print('Warning: Unable to calculate scene bounds for optimized shadows')
+            light_lens.set_film_size(100, 100)
 
 
 @dataclass(kw_only=True)
@@ -166,6 +183,12 @@ class MainClient(GameState):
         self.target_line.set_light_off(1)
         self.target_line.set_material(mat)
 
+        # Ambient lighting
+        self.ambient_light = self.root_node.attach_new_node(p3d.AmbientLight('Ambient'))
+        ambstr = 0.2
+        self.ambient_light.node().set_color((ambstr, ambstr, ambstr, 1.0))
+        self.root_node.set_light(self.ambient_light)
+
 
         self.camera_target = self.root_node.attach_new_node('Camera Target')
         self.playerid = None
@@ -189,6 +212,11 @@ class MainClient(GameState):
     def start(self):
         self.level = Level.create(self.resources['level'])
         self.level.root.reparent_to(self.root_node)
+        for light in self.level.root.find_all_matches('**/+Light'):
+            light.parent.wrt_reparent_to(self.root_node)
+            self.root_node.set_light(light)
+
+        self.root_node.ls()
 
     def cleanup(self):
         super().cleanup()
