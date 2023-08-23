@@ -153,6 +153,19 @@ class MainClient(GameState):
 
         base.camLens.set_fov(70)
 
+        # Build a targeting line visual for player
+        line_segs = p3d.LineSegs()
+        line_segs.set_color(1, 0, 0, 0.5)
+        line_segs.set_thickness(2.5)
+        line_segs.move_to(0, 0, 0.5)
+        line_segs.draw_to(0, -100, 0.5)
+        self.target_line = p3d.NodePath(line_segs.create())
+        mat = p3d.Material('Target Line')
+        mat.set_base_color(p3d.LColor(1, 0, 0, 1))
+        self.target_line.set_transparency(p3d.TransparencyAttrib.M_alpha)
+        self.target_line.set_light_off(1)
+        self.target_line.set_material(mat)
+
 
         self.camera_target = self.root_node.attach_new_node('Camera Target')
         self.playerid = None
@@ -187,6 +200,8 @@ class MainClient(GameState):
         self.resources['player'].instance_to(player_node)
 
         self.player_nodes[playerid] = player_node
+        if playerid == self.playerid:
+            self.target_line.reparent_to(player_node)
 
     def handle_messages(self, messages):
         for msg in messages:
