@@ -40,6 +40,7 @@ class Level:
 
         for caster in model.find_all_matches('**/=type=shadow_caster/+Light'):
             caster.node().set_shadow_caster(True, 1024, 1024)
+            caster.node().set_camera_mask(p3d.BitMask32.bit(1))
             level.recalc_light_bounds(caster)
 
         return level
@@ -160,6 +161,8 @@ class MainClient(GameState):
         self.network = network
         self.level = None
 
+        self.root_node.show(p3d.BitMask32.bit(1))
+
         # Set confined mouse mode
         self.window = base.win
         self.prev_win_props = self.window.requested_properties
@@ -181,6 +184,7 @@ class MainClient(GameState):
         self.target_line.set_transparency(p3d.TransparencyAttrib.M_alpha)
         self.target_line.set_light_off(1)
         self.target_line.set_material(mat)
+        self.target_line.hide(p3d.BitMask32.bit(1))
 
         # Ambient lighting
         self.ambient_light = self.root_node.attach_new_node(p3d.AmbientLight('Ambient'))
