@@ -27,13 +27,13 @@ class PandaNetworkTransport(NetworkTransport):
     num_threads: InitVar[int] = 0
 
     _manager: p3d.QueuedConnectionManager = field(init=False)
-    _listener: p3d.QueuedConnectionListener | None = field(init=False, default=None)
-    _reader: p3d.QueuedConnectionReader | None = field(init=False)
+    _listener: p3d.QueuedConnectionListener = field(init=False)
+    _reader: p3d.QueuedConnectionReader = field(init=False)
     _writer: p3d.ConnectionWriter = field(init=False)
     _is_started: bool = field(init=False, default=False)
     _connections: list[p3d.Connection] = field(init=False, default_factory=list)
 
-    def __post_init__(self, num_threads) -> None:
+    def __post_init__(self, num_threads: int) -> None:
         self._manager = p3d.QueuedConnectionManager()
         self._writer = p3d.ConnectionWriter(self._manager, num_threads)
         self._reader = p3d.QueuedConnectionReader(self._manager, num_threads)
@@ -81,7 +81,7 @@ class PandaNetworkTransport(NetworkTransport):
         if not self._reader:
             return []
 
-        messages: list[p3d.NetDatagram] = []
+        messages: list[tuple[int, bytes]] = []
         while self._reader.data_available():
             datagram = p3d.NetDatagram()
             if self._reader.get_data(datagram):

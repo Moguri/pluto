@@ -3,20 +3,9 @@ import pytest
 from lib import networking
 from lib.networking_transport import PandaNetworkTransport
 
-@networking.replicatable
-class RepData:
-    intval: int = networking.repfield(default=5)
-
 
 class NetMsg(networking.NetworkMessage):
     data: str
-
-
-def test_networking_rep_metadata():
-    data = RepData()
-    fields = networking.get_replicated_fields(data)
-    assert fields
-    assert fields[0].name == 'intval'
 
 
 def test_networking_panda_transport_setup():

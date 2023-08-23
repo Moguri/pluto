@@ -7,15 +7,16 @@ import panda3d.core as p3d
 
 from direct.showbase.DirectObject import DirectObject
 from direct.showbase.ShowBase import ShowBase
+from direct.showbase.Loader import Loader
 from direct.task.TaskManagerGlobal import taskMgr as task_mgr
 
 
 class GameState:
-    def __init__(self, base) -> None:
+    def __init__(self, base: ShowBase) -> None:
         super().__init__()
         self.events: DirectObject = DirectObject()
-        self.root_node: p3d.NodePath[p3d.PandaNode] | None = p3d.NodePath('State Root')
-        self.root_node2d: p3d.NodePath[p3d.PandaNode] | None = p3d.NodePath('State Root 2D')
+        self.root_node: p3d.NodePath[p3d.PandaNode] = p3d.NodePath('State Root')
+        self.root_node2d: p3d.NodePath[p3d.PandaNode] = p3d.NodePath('State Root 2D')
         self.resources: dict[str, p3d.NodePath] = {}
 
         if base:
@@ -24,14 +25,12 @@ class GameState:
 
     def cleanup(self) -> None:
         self.events.ignoreAll()
-        if self.root_node:
-            self.root_node.remove_node()
-            self.root_node = None
-        if self.root_node2d:
-            self.root_node2d.remove_node()
-            self.root_node2d = None
+        self.root_node.remove_node()
+        self.root_node = None
+        self.root_node2d.remove_node()
+        self.root_node2d = None
 
-    async def load(self, loader) -> None:
+    async def load(self, loader: Loader) -> None:
         resources = getattr(self.__class__, 'RESOURCES', {})
 
         for name, filepath in resources.items():

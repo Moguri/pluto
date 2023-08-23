@@ -191,7 +191,7 @@ class MainClient(GameState):
 
         self.camera_target = self.root_node.attach_new_node('Camera Target')
         self.playerid = None
-        self.player_nodes = {}
+        self.player_nodes: dict[int, p3d.NodePath] = {}
         self.cursor = CursorInput(
             mouse_watcher=base.mouseWatcherNode,
             camera_node=base.cam,
@@ -271,8 +271,8 @@ class MainServer(GameState):
         self.network = network
         self.level = None
 
-        self.player_contrs = {}
-        self.player_nodes = {}
+        self.player_contrs: dict[int, PlayerController] = {}
+        self.player_nodes: dict[int, p3d.NodePath] = {}
 
     def start(self) -> None:
         self.level = Level.create(self.resources['level'])

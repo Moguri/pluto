@@ -24,7 +24,7 @@ VecTypes = (
 class NetworkMessage(msgspec.Struct, array_like=True, kw_only=True):
     connection_id: int | None = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         for field in self.__struct_fields__:
             annotation = self.__annotations__.get(field)
             attr = getattr(self, field)

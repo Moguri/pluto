@@ -2,9 +2,7 @@ import functools
 import struct
 from typing import (
     Any,
-    ClassVar,
     Protocol,
-    Type,
 )
 
 import msgspec
@@ -23,12 +21,12 @@ class NetworkSerializer(Protocol):
     def deserialize(
         self,
         msgbytes: bytes,
-        msgtype: ClassVar[NetworkMessage]
+        msgtype: type[NetworkMessage]
     ) -> NetworkMessage: ...
 
 
 class MsgspecNetworkSerializer(NetworkSerializer):
-    def __init__(self):
+    def __init__(self) -> None:
         protocol = msgspec.msgpack
         self._encoder = protocol.Encoder(
             enc_hook=self._enc_hook
@@ -44,7 +42,7 @@ class MsgspecNetworkSerializer(NetworkSerializer):
         if isinstance(obj, p3d.LVecBase2f | p3d.LVecBase3f | p3d.LVecBase4f):
             return struct.pack('!' + 'f' * obj.get_num_components(), *obj)
 
-    def _dec_hook(self, objtype: Type, obj: Any) -> Any:
+    def _dec_hook(self, objtype: type, obj: Any) -> Any:
         if issubclass(objtype, p3d.LVecBase2d | p3d.LVecBase3d | p3d.LVecBase4d):
             return objtype(*obj)
         if issubclass(objtype, Vec2H | Vec3H | Vec4H):
@@ -60,6 +58,6 @@ class MsgspecNetworkSerializer(NetworkSerializer):
     def deserialize(
         self,
         msgbytes: bytes,
-        msgtype: ClassVar[NetworkMessage]
+        msgtype: type[NetworkMessage]
     ) -> NetworkMessage:
         return self._decode(msgbytes, type=msgtype)

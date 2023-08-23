@@ -1,4 +1,3 @@
-import dataclasses
 from dataclasses import (
     dataclass,
     field,
@@ -8,8 +7,7 @@ from enum import Enum
 import inspect
 import struct
 from typing import (
-    Any,
-    ClassVar,
+    Any
 )
 
 from .networking_transport import (
@@ -34,43 +32,19 @@ class NetRole(Enum):
     DUAL = 3
 
 
-# alias for now, we might need to expand on this later
-replicatable = dataclass
-
-
-@dataclasses.dataclass(kw_only=True)
-class RepInfo:
-    is_replicated: bool = field(default=True, init=False)
-
-
-def repfield(**kwargs):
-    repinfo = RepInfo()
-    kwargs['metadata'] = dataclasses.asdict(repinfo)
-    return dataclasses.field(**kwargs)
-
-
-def get_replicated_fields(replicatable_object: Any):
-    return [
-        field
-        for field in
-        dataclasses.fields(replicatable_object)
-        if field.metadata.get('is_replicated', False)
-    ]
-
-
-@dataclasses.dataclass(kw_only=True)
+@dataclass(kw_only=True)
 class NetworkManager:
     net_role: NetRole
-    transport_type: InitVar[ClassVar[NetworkTransport]] = PandaNetworkTransport
+    transport_type: InitVar[type[NetworkTransport]] = PandaNetworkTransport
     serializer: NetworkSerializer = field(default_factory=MsgspecNetworkSerializer)
     host: str = 'localhost'
     port: int = 8080
 
     _client_transport: NetworkTransport | None = field(init=False, default=None)
     _server_transport: NetworkTransport | None = field(init=False, default=None)
-    _message_types: list[ClassVar[NetworkMessage]] = field(init=False, default_factory=list)
+    _message_types: list[type[NetworkMessage]] = field(init=False, default_factory=list)
 
-    def __post_init__(self, transport_type: ClassVar[NetworkTransport]) -> None:
+    def __post_init__(self, transport_type: type[NetworkTransport]) -> None:
         start_server = False
         start_client = False
         match self.net_role:
@@ -93,7 +67,7 @@ class NetworkManager:
 
         self.update()
 
-    def register_message_types(self, *message_types: ClassVar[NetworkMessage]) -> None:
+    def register_message_types(self, *message_types: type[NetworkMessage]) -> None:
         for message_type in message_types:
             try:
                 self._message_types.index(message_type)
@@ -147,7 +121,7 @@ class NetworkManager:
         msgobj.connection_id = connid
         return msgobj
 
-    def _transport_from_netrole(self, netrole: NetRole = NetRole):
+    def _transport_from_netrole(self, netrole: NetRole = NetRole.DUAL) -> NetworkTransport:
         if self.net_role == NetRole.DUAL and netrole == NetRole.DUAL:
             raise RuntimeError('Must specify a netrole when running as NetRole.DUAL')
         if self.net_role != NetRole.DUAL:
@@ -160,7 +134,7 @@ class NetworkManager:
 
         raise RuntimeError('Could not find a transport object for netrole')
 
-    def send(self, message: NetworkMessage, netrole: NetRole = NetRole.DUAL):
+    def send(self, message: NetworkMessage, netrole: NetRole = NetRole.DUAL) -> None:
         msgbytes = self._serialize_net_msg(message)
         self._transport_from_netrole(netrole).send(msgbytes, message.connection_id)
 
