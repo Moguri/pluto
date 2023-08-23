@@ -53,7 +53,6 @@ class Level:
             light_lens.set_film_size(bmax.xz - bmin.xz)
             light_lens.set_near_far(bmin.y, bmax.y)
         else:
-            self.root.ls()
             print('Warning: Unable to calculate scene bounds for optimized shadows')
             light_lens.set_film_size(100, 100)
 
