@@ -1,6 +1,8 @@
-from dataclasses import dataclass, field
+from dataclasses import (
+    dataclass,
+    field,
+)
 import math
-
 from typing import (
     Self,
 )
@@ -8,6 +10,7 @@ from typing import (
 import panda3d.core as p3d
 from direct.showbase.ShowBase import ShowBase
 from direct.showbase.DirectObject import DirectObject
+from direct.actor.Actor import Actor
 
 from lib.gamestates import GameState
 from lib.networking import (
@@ -149,10 +152,39 @@ class PlayerController:
         self.player_node.set_h(self.player_node.get_h() - 180)
 
 
+@dataclass(kw_only=True)
+class AnimController:
+    ANIM_MAP = {
+        'idle': 'Idle',
+        'move': 'Run',
+    }
+    player_node: p3d.NodePath
+    actor: Actor
+    prev_pos: p3d.Vec3 = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.prev_pos = self.player_node.get_pos()
+
+    def update(self) -> None:
+        distmoved = self.player_node.get_pos() - self.prev_pos
+        if distmoved.length_squared() > 0.01:
+            self.start_loop('move')
+        else:
+            self.start_loop('idle')
+
+        self.prev_pos = self.player_node.get_pos()
+
+    def start_loop(self, anim: str) -> None:
+        anim = self.ANIM_MAP[anim]
+        if self.actor.get_current_anim() != anim:
+            self.actor.loop(anim)
+
+
 class MainClient(GameState):
     RESOURCES = {
         'level': 'levels/testenv.bam',
-        'player': 'skeleton.bam',
+        'player': 'characters/skeleton.bam',
+        'animations': 'animations/animations.bam',
     }
 
     def __init__(self, base: ShowBase, network: NetworkManager):
@@ -160,6 +192,7 @@ class MainClient(GameState):
 
         self.network = network
         self.level = None
+        self.player_model = None
 
         self.root_node.show(p3d.BitMask32.bit(1))
 
@@ -196,6 +229,7 @@ class MainClient(GameState):
         self.camera_target = self.root_node.attach_new_node('Camera Target')
         self.playerid = None
         self.player_nodes: dict[int, p3d.NodePath] = {}
+        self.anim_contrs: dict[int, AnimController] = {}
         self.cursor = CursorInput(
             mouse_watcher=base.mouseWatcherNode,
             camera_node=base.cam,
@@ -219,6 +253,18 @@ class MainClient(GameState):
             light.parent.wrt_reparent_to(self.root_node)
             self.root_node.set_light(light)
 
+        anims = self.resources['animations']
+        animbundle = p3d.NodePath('Player Animations')
+        for bundle in anims.find_all_matches('**/+AnimBundleNode'):
+            bundle.reparent_to(animbundle)
+
+        player = self.resources['player']
+        char = player.find('**/+Character')
+        animbundle.instance_to(char)
+
+        self.player_model = player
+
+
     def cleanup(self):
         super().cleanup()
 
@@ -226,7 +272,14 @@ class MainClient(GameState):
 
     def add_new_player(self, playerid):
         player_node = self.root_node.attach_new_node(f'Player {playerid}')
-        self.resources['player'].instance_to(player_node)
+        if self.player_model:
+            actor = Actor(self.player_model)
+            actor.reparent_to(player_node)
+            anim_contr = AnimController(
+                player_node=player_node,
+                actor=actor,
+            )
+            self.anim_contrs[playerid] = anim_contr
 
         self.player_nodes[playerid] = player_node
         if playerid == self.playerid:
@@ -254,6 +307,8 @@ class MainClient(GameState):
         self.cursor.update()
         self.player_input.update()
         self.cam_contr.update(dt)
+        for anim_contr in self.anim_contrs.values():
+            anim_contr.update()
 
         player_update = PlayerInputMsg(
             move_dir=self.player_input.move_dir,

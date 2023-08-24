@@ -49,6 +49,13 @@ ignore_patterns = [
 ]
 show_all_jobs = true
 
+[tool.pman.blend2bam]
+animations = 'skip'
+
+[[tool.pman.blend2bam.overrides]]
+pattern = '*animations*'
+animations = 'embed'
+
 [tool.pman.build_apps]
 plugins = [
     "pandagl",
