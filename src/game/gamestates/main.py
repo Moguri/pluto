@@ -219,8 +219,6 @@ class MainClient(GameState):
             light.parent.wrt_reparent_to(self.root_node)
             self.root_node.set_light(light)
 
-        self.root_node.ls()
-
     def cleanup(self):
         super().cleanup()
 
