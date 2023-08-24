@@ -19,6 +19,7 @@ The project is split into two python packages:
 
 ## Preparing the environment
 
+* Install and setup [git lfs](https://git-lfs.com/)
 * Setup a [virtual environment](https://docs.python.org/3/tutorial/venv.html) (optional, but recommended)
 * Install [Blender](https://www.blender.org/download/) (should be made available on the system `PATH`)
 * Install the project in develop mode: `pip install -e .[test]`
