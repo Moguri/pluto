@@ -20,7 +20,7 @@ class NetworkTransport(Protocol):
     def get_new_connections(self) -> Iterable[int]: ...
     def get_disconnects(self) -> Iterable[int]: ...
     def get_messages(self) -> Iterable[tuple[int, bytes]]: ...
-    def send(self, message: bytes, connection_id: int | None = None) -> None: ...
+    def send(self, message: bytes, connection_id: int) -> None: ...
 
 
 @dataclass(kw_only=True)
@@ -122,9 +122,9 @@ class PandaNetworkTransport(NetworkTransport):
 
         return messages
 
-    def send(self, message: bytes, connection_id: int | None = None) -> None:
-        connections = self._connections.values()
-        if connection_id is not None:
+    def send(self, message: bytes, connection_id: int = -1) -> None:
+        connections: Iterable[p3d.Connection] = self._connections.values()
+        if connection_id >= 0:
             connections = [self._connections[connection_id]]
         datagram = PyDatagram()
         datagram.add_blob(message)

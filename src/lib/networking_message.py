@@ -22,7 +22,7 @@ VecTypes = (
 
 
 class NetworkMessage(msgspec.Struct, array_like=True, kw_only=True):
-    connection_id: int | None = None
+    connection_id: int = -1
 
     def __post_init__(self) -> None:
         for field in self.__struct_fields__:

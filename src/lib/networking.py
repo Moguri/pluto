@@ -135,12 +135,12 @@ class NetworkManager:
         if self.net_role != NetRole.DUAL:
             netrole = self.net_role
 
-        if netrole == NetRole.CLIENT:
+        if netrole == NetRole.CLIENT and self._client_transport is not None:
             return self._client_transport
-        if netrole == NetRole.SERVER:
+        if netrole == NetRole.SERVER and self._server_transport is not None:
             return self._server_transport
 
-        raise RuntimeError('Could not find a transport object for netrole')
+        raise RuntimeError(f'Could not find a transport object for netrole: {netrole}')
 
     def send(self, message: NetworkMessage, netrole: NetRole = NetRole.DUAL) -> None:
         msgbytes = self._serialize_net_msg(message)

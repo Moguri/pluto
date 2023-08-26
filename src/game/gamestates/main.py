@@ -4,6 +4,7 @@ from dataclasses import (
 )
 import math
 from typing import (
+    cast,
     Self,
 )
 
@@ -15,6 +16,7 @@ from direct.actor.Actor import Actor
 from lib.gamestates import GameState
 from lib.networking import (
     NetworkManager,
+    NetworkMessage,
     NetRole,
 )
 from game.network_messages import (
@@ -87,7 +89,7 @@ class CursorInput:
     _last_pos: p3d.Vec3 = field(init=False, default_factory=p3d.Vec3)
     _ground_plane: p3d.Plane = field(init=False)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.ground_plane = p3d.Plane(p3d.Vec3(0, 0, 1), p3d.Vec3(0, 0, 0))
 
     def update(self) -> None:
@@ -116,8 +118,8 @@ class PlayerInput:
     move_dir: p3d.Vec2 = field(init=False, default_factory=p3d.Vec2)
     aim_pos: p3d.Vec3 = field(init=False, default_factory=p3d.Vec3)
 
-    def __post_init__(self):
-        def move(dir_vec):
+    def __post_init__(self) -> None:
+        def move(dir_vec: p3d.Vec2) -> None:
             self.move_dir += dir_vec
         self.events.accept('move-up', move, [p3d.Vec2(0, 1)])
         self.events.accept('move-up-up', move, [p3d.Vec2(0, -1)])
@@ -139,7 +141,7 @@ class PlayerController:
     move_dir: p3d.Vec2 = field(init=False, default_factory=p3d.Vec2)
     aim_pos: p3d.Vec3 = field(init=False, default_factory=p3d.Vec3)
 
-    def update(self, dt):
+    def update(self, dt: float) -> None:
         # Update player position
         prevpos = self.player_node.get_pos()
         movedir = p3d.Vec3(self.move_dir.x, self.move_dir.y, 0).normalized()
@@ -192,8 +194,8 @@ class MainClient(GameState):
         super().__init__(base)
 
         self.network = network
-        self.level = None
-        self.player_model = None
+        self.level: Level = cast(Level, None)
+        self.player_model: p3d.NodePath = cast(p3d.NodePath, None)
 
         self.root_node.show(p3d.BitMask32.bit(1))
 
@@ -228,7 +230,7 @@ class MainClient(GameState):
 
 
         self.camera_target = self.root_node.attach_new_node('Camera Target')
-        self.playerid = None
+        self.playerid: int | None = None
         self.player_nodes: dict[int, p3d.NodePath] = {}
         self.anim_contrs: dict[int, AnimController] = {}
         self.cursor = CursorInput(
@@ -247,7 +249,7 @@ class MainClient(GameState):
             distance=25,
         )
 
-    def start(self):
+    def start(self) -> None:
         self.level = Level.create(self.resources['level'])
         self.level.root.reparent_to(self.root_node)
         for light in self.level.root.find_all_matches('**/+Light'):
@@ -266,12 +268,12 @@ class MainClient(GameState):
         self.player_model = player
 
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         super().cleanup()
 
         self.window.request_properties(self.prev_win_props)
 
-    def add_new_player(self, playerid):
+    def add_new_player(self, playerid: int) -> None:
         player_node = self.root_node.attach_new_node(f'Player {playerid}')
         if self.player_model:
             actor = Actor(self.player_model)
@@ -286,12 +288,12 @@ class MainClient(GameState):
         if playerid == self.playerid:
             self.target_line.reparent_to(player_node)
 
-    def remove_player(self, playerid):
+    def remove_player(self, playerid: int) -> None:
         self.player_nodes[playerid].remove_node()
         del self.player_nodes[playerid]
         del self.anim_contrs[playerid]
 
-    def handle_messages(self, messages):
+    def handle_messages(self, messages: list[NetworkMessage]) -> None:
         for msg in messages:
             match msg:
                 case RegisterPlayerIdMsg():
@@ -309,7 +311,7 @@ class MainClient(GameState):
                 case _:
                     print(f'Unknown message type: {type(msg)}')
 
-    def update(self, dt: float):
+    def update(self, dt: float) -> None:
         if self.playerid is not None and self.playerid in self.player_nodes:
             self.camera_target.set_pos(self.player_nodes[self.playerid].get_pos())
         self.cursor.update()
@@ -330,11 +332,11 @@ class MainServer(GameState):
         'level': 'levels/testenv.bam',
     }
 
-    def __init__(self, base: ShowBase, network: NetworkManager):
+    def __init__(self, base: ShowBase, network: NetworkManager) -> None:
         super().__init__(base)
 
         self.network = network
-        self.level = None
+        self.level: Level = cast(Level, None)
 
         self.player_contrs: dict[int, PlayerController] = {}
         self.player_nodes: dict[int, p3d.NodePath] = {}
@@ -344,7 +346,7 @@ class MainServer(GameState):
         self.level.root.reparent_to(self.root_node)
 
 
-    def add_new_player(self, connid: int):
+    def add_new_player(self, connid: int) -> None:
         playerid = connid
 
         self.player_nodes[playerid] = self.root_node.attach_new_node(f'Player {playerid}')
@@ -364,7 +366,7 @@ class MainServer(GameState):
         del self.player_contrs[playerid]
         self.network.send(RemovePlayerMsg(playerid=playerid), NetRole.CLIENT)
 
-    def handle_messages(self, messages) -> None:
+    def handle_messages(self, messages: list[NetworkMessage]) -> None:
         for msg in messages:
             match msg:
                 case PlayerInputMsg():
