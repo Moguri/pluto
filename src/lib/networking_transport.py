@@ -17,7 +17,8 @@ from direct.distributed.PyDatagramIterator import PyDatagramIterator
 class NetworkTransport(Protocol):
     def start_server(self, port: int) -> None: ...
     def start_client(self, host: str, port: int) -> None: ...
-    def update(self) -> None: ...
+    def get_new_connections(self) -> Iterable[int]: ...
+    def get_disconnects(self) -> Iterable[int]: ...
     def get_messages(self) -> Iterable[tuple[int, bytes]]: ...
     def send(self, message: bytes, connection_id: int | None = None) -> None: ...
 
@@ -31,7 +32,8 @@ class PandaNetworkTransport(NetworkTransport):
     _reader: p3d.QueuedConnectionReader = field(init=False)
     _writer: p3d.ConnectionWriter = field(init=False)
     _is_started: bool = field(init=False, default=False)
-    _connections: list[p3d.Connection] = field(init=False, default_factory=list)
+    _connections: dict[int, p3d.Connection] = field(init=False, default_factory=dict)
+    _next_id: int = field(init=False, default=0)
 
     def __post_init__(self, num_threads: int) -> None:
         self._manager = p3d.QueuedConnectionManager()
@@ -57,25 +59,49 @@ class PandaNetworkTransport(NetworkTransport):
 
         if conn:
             conn.set_no_delay(True)
-            self._connections.append(conn)
+            self._connections[self._next_id] = conn
+            self._next_id += 1
             self._reader.add_connection(conn)
             self._is_started = True
             print(f'Client connected to server: {conn.get_address()}')
         else:
             raise RuntimeError(f'Failed to connect to server at {host}:{port}')
 
-    def update(self) -> None:
-        if not self._listener.new_connection_available():
-            return
+    def get_new_connections(self) -> Iterable[int]:
+        conn_ptr = p3d.PointerToConnection()
+        new_conn_ids = []
 
-        new_conn_ptr = p3d.PointerToConnection()
-
-        while self._listener.get_new_connection(new_conn_ptr):
-            new_conn = new_conn_ptr.p()
+        while self._listener.new_connection_available():
+            self._listener.get_new_connection(conn_ptr)
+            new_conn = conn_ptr.p()
             new_conn.set_no_delay(True)
             print(f'Server received a new connection: {new_conn.get_address()}')
-            self._connections.append(new_conn)
+            new_conn_ids.append(self._next_id)
+            self._connections[self._next_id] = new_conn
+            self._next_id += 1
             self._reader.add_connection(new_conn)
+
+        return new_conn_ids
+
+    def get_disconnects(self) -> Iterable[int]:
+        conn_ptr = p3d.PointerToConnection()
+        dc_conn_ids = []
+
+        try:
+            while self._manager.reset_connection_available():
+                self._manager.get_reset_connection(conn_ptr)
+                rst_conn = conn_ptr.p()
+                conn_id = list(self._connections.keys())[
+                    list(self._connections.values()).index(rst_conn)
+                ]
+                dc_conn_ids.append(conn_id)
+                self._manager.close_connection(rst_conn)
+                del self._connections[conn_id]
+                print(f'Connection disconnected: {conn_id}')
+        except AssertionError:
+            pass
+
+        return dc_conn_ids
 
     def get_messages(self) -> Iterable[tuple[int, bytes]]:
         if not self._reader:
@@ -86,13 +112,16 @@ class PandaNetworkTransport(NetworkTransport):
             datagram = p3d.NetDatagram()
             if self._reader.get_data(datagram):
                 msg = PyDatagramIterator(datagram)
-                connectionid = self._connections.index(datagram.get_connection())
+                conn = datagram.get_connection()
+                connectionid = list(self._connections.keys())[
+                    list(self._connections.values()).index(conn)
+                ]
                 messages.append((connectionid, msg.get_blob()))
 
         return messages
 
     def send(self, message: bytes, connection_id: int | None = None) -> None:
-        connections = self._connections
+        connections = self._connections.values()
         if connection_id is not None:
             connections = [self._connections[connection_id]]
         datagram = PyDatagram()

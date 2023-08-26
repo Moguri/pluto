@@ -64,6 +64,16 @@ class NetworkGameStateManager:
         if netrole == NetRole.DUAL or netrole == NetRole.SERVER:
             self.server_gsm = GameStateManager(showbase, server_states)
 
+        def handle_dc(conn_id):
+            clientstate = self.client_gsm and self.client_gsm.current_state
+            if clientstate and hasattr(clientstate, 'handle_disconnect'):
+                clientstate.handle_disconnect(conn_id)
+
+            serverstate = self.server_gsm and self.server_gsm.current_state
+            if serverstate and hasattr(serverstate, 'handle_disconnect'):
+                serverstate.handle_disconnect(conn_id)
+        self.network.disconnect_handler = handle_dc
+
     def _handle_messages(self, gsm: GameStateManager, netrole: NetRole):
         if not gsm.load_complete:
             return

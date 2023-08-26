@@ -9,6 +9,10 @@ class RegisterPlayerIdMsg(NetworkMessage):
     playerid: int
 
 
+class RemovePlayerMsg(NetworkMessage):
+    playerid: int
+
+
 class PlayerInputMsg(NetworkMessage):
     move_dir: Vec2H
     aim_pos: Vec3H

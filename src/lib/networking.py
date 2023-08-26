@@ -7,7 +7,8 @@ from enum import Enum
 import inspect
 import struct
 from typing import (
-    Any
+    Any,
+    Callable,
 )
 
 from .networking_transport import (
@@ -35,6 +36,8 @@ class NetRole(Enum):
 @dataclass(kw_only=True)
 class NetworkManager:
     net_role: NetRole
+    new_connection_handler: Callable[[int], None] = lambda _conn_id: None
+    disconnect_handler: Callable[[int], None] = lambda _conn_id: None
     transport_type: InitVar[type[NetworkTransport]] = PandaNetworkTransport
     serializer: NetworkSerializer = field(default_factory=MsgspecNetworkSerializer)
     host: str = 'localhost'
@@ -94,10 +97,15 @@ class NetworkManager:
         self.register_message_types(*msgtypes)
 
     def update(self) -> None:
-        if self._server_transport:
-            self._server_transport.update()
-        if self._client_transport:
-            self._client_transport.update()
+        for transport in [self._server_transport, self._client_transport]:
+            if not transport:
+                continue
+            ids = transport.get_new_connections()
+            for conn_id in ids:
+                self.new_connection_handler(conn_id)
+            ids = transport.get_disconnects()
+            for conn_id in ids:
+                self.disconnect_handler(conn_id)
 
     def _serialize_net_msg(self, message: NetworkMessage) -> bytes:
         msgtype = type(message)

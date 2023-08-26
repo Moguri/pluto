@@ -21,6 +21,7 @@ from game.network_messages import (
     PlayerInputMsg,
     PlayerUpdateMsg,
     RegisterPlayerIdMsg,
+    RemovePlayerMsg,
 )
 
 
@@ -285,11 +286,18 @@ class MainClient(GameState):
         if playerid == self.playerid:
             self.target_line.reparent_to(player_node)
 
+    def remove_player(self, playerid):
+        self.player_nodes[playerid].remove_node()
+        del self.player_nodes[playerid]
+        del self.anim_contrs[playerid]
+
     def handle_messages(self, messages):
         for msg in messages:
             match msg:
                 case RegisterPlayerIdMsg():
                     self.playerid = msg.playerid
+                case RemovePlayerMsg():
+                    self.remove_player(msg.playerid)
                 case PlayerUpdateMsg():
                     playerid = msg.playerid
                     if playerid not in self.player_nodes:
@@ -336,7 +344,7 @@ class MainServer(GameState):
         self.level.root.reparent_to(self.root_node)
 
 
-    def add_new_player(self, connid):
+    def add_new_player(self, connid: int):
         playerid = connid
 
         self.player_nodes[playerid] = self.root_node.attach_new_node(f'Player {playerid}')
@@ -347,6 +355,14 @@ class MainServer(GameState):
         register_player = RegisterPlayerIdMsg(playerid=playerid)
         register_player.connection_id = connid
         self.network.send(register_player, NetRole.SERVER)
+
+    def remove_player(self, connid: int) -> None:
+        playerid = connid
+
+        self.player_nodes[playerid].remove_node()
+        del self.player_nodes[playerid]
+        del self.player_contrs[playerid]
+        self.network.send(RemovePlayerMsg(playerid=playerid), NetRole.CLIENT)
 
     def handle_messages(self, messages) -> None:
         for msg in messages:
@@ -360,6 +376,9 @@ class MainServer(GameState):
                     player_contr.aim_pos = msg.aim_pos
                 case _:
                     print(f'Unknown message type: {type(msg)}')
+
+    def handle_disconnect(self, conn_id: int)-> None:
+        self.remove_player(conn_id)
 
     def update(self, dt: float) -> None:
         for playerid, player_contr in self.player_contrs.items():
