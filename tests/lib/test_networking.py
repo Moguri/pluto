@@ -14,7 +14,7 @@ def test_networking_panda_transport_setup():
 
     client = PandaNetworkTransport()
     client.start_client('localhost', 8080)
-    server.update()
+    server.get_new_connections()
 
     # Send a message from client to server
     msg = b'Hello world'
@@ -42,6 +42,7 @@ def test_networking_manager_setup():
     manager = networking.NetworkManager(net_role=networking.NetRole.CLIENT, port=8080)
     assert manager
 
+    del manager
     manager = networking.NetworkManager(net_role=networking.NetRole.DUAL, port=8083)
     assert manager
 

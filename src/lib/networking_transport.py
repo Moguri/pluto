@@ -46,6 +46,8 @@ class PandaNetworkTransport(NetworkTransport):
             raise RuntimeError('Cannot start as server: already started')
 
         conn = self._manager.open_TCP_server_rendezvous(port, 100)
+        if conn is None:
+            raise RuntimeError('Failed to open listen connection. Is the address already in use?')
         self._listener.add_connection(conn)
 
         self._is_started = True
