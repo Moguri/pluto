@@ -1,6 +1,7 @@
 from dataclasses import (
     dataclass,
     field,
+    InitVar,
 )
 import math
 from typing import (
@@ -12,6 +13,11 @@ import panda3d.core as p3d
 from direct.showbase.ShowBase import ShowBase
 from direct.showbase.DirectObject import DirectObject
 from direct.actor.Actor import Actor
+from direct.interval.IntervalGlobal import (
+    FunctionInterval,
+    Sequence,
+)
+from direct.interval.LerpInterval import LerpPosInterval
 
 from lib.gamestates import GameState
 from lib.networking import (
@@ -24,6 +30,7 @@ from game.network_messages import (
     PlayerUpdateMsg,
     RegisterPlayerIdMsg,
     RemovePlayerMsg,
+    SpawnProjectileMsg,
 )
 
 
@@ -117,10 +124,13 @@ class PlayerInput:
     cursor: CursorInput
     move_dir: p3d.Vec2 = field(init=False, default_factory=p3d.Vec2)
     aim_pos: p3d.Vec3 = field(init=False, default_factory=p3d.Vec3)
+    actions: set[str] = field(init=False, default_factory=set)
 
     def __post_init__(self) -> None:
         def move(dir_vec: p3d.Vec2) -> None:
             self.move_dir += dir_vec
+        def add_action(action: str) -> None:
+            self.actions.add(action)
         self.events.accept('move-up', move, [p3d.Vec2(0, 1)])
         self.events.accept('move-up-up', move, [p3d.Vec2(0, -1)])
         self.events.accept('move-down', move, [p3d.Vec2(0, -1)])
@@ -129,6 +139,7 @@ class PlayerInput:
         self.events.accept('move-left-up', move, [p3d.Vec2(1, 0)])
         self.events.accept('move-right', move, [p3d.Vec2(1, 0)])
         self.events.accept('move-right-up', move, [p3d.Vec2(-1, 0)])
+        self.events.accept('fire', add_action, ['fire'])
 
     def update(self) -> None:
         self.aim_pos = self.cursor.get_pos()
@@ -183,6 +194,46 @@ class AnimController:
             self.actor.loop(anim)
 
 
+@dataclass(kw_only=True)
+class Projectile:
+    distance: int = 75
+    model: InitVar[p3d.NodePath]
+    render_node: InitVar[p3d.NodePath]
+    player_node: InitVar[p3d.NodePath]
+    root: p3d.NodePath = field(init=False)
+    is_done: bool = field(init=False)
+
+    def __post_init__(
+        self,
+        model: p3d.NodePath,
+        render_node: p3d.NodePath,
+        player_node: p3d.NodePath
+    ) -> None:
+        self.root = render_node.attach_new_node('Projectile')
+        model.instance_to(self.root)
+        self.root.hide(p3d.BitMask32.bit(1))
+
+        self.root.set_pos_hpr(
+            player_node.get_pos(),
+            player_node.get_hpr()
+        )
+
+        def end():
+            self.root.remove_node()
+            self.is_done = True
+
+        Sequence(
+            LerpPosInterval(
+                nodePath=self.root,
+                duration=1.0,
+                pos=render_node.get_relative_point(player_node, (0, -self.distance, 0))
+            ),
+            FunctionInterval(
+                function=end
+            )
+        ).start()
+
+
 class MainClient(GameState):
     RESOURCES = {
         'level': 'levels/testenv.bam',
@@ -221,6 +272,8 @@ class MainClient(GameState):
         self.target_line.set_light_off(1)
         self.target_line.set_material(mat)
         self.target_line.hide(p3d.BitMask32.bit(1))
+
+        self.projectiles: list[Projectile] = []
 
         # Ambient lighting
         self.ambient_light = self.root_node.attach_new_node(p3d.AmbientLight('Ambient'))
@@ -308,6 +361,14 @@ class MainClient(GameState):
                         msg.position,
                         msg.hpr
                     )
+                case SpawnProjectileMsg():
+                    playerid = msg.playerid
+                    proj = Projectile(
+                        model=self.resources['player'],
+                        player_node=self.player_nodes[playerid],
+                        render_node=self.root_node,
+                    )
+                    self.projectiles.append(proj)
                 case _:
                     print(f'Unknown message type: {type(msg)}')
 
@@ -322,9 +383,11 @@ class MainClient(GameState):
 
         player_update = PlayerInputMsg(
             move_dir=self.player_input.move_dir,
-            aim_pos=self.player_input.aim_pos
+            aim_pos=self.player_input.aim_pos,
+            actions=self.player_input.actions,
         )
         self.network.send(player_update, NetRole.CLIENT)
+        self.player_input.actions.clear()
 
 
 class MainServer(GameState):
@@ -340,11 +403,11 @@ class MainServer(GameState):
 
         self.player_contrs: dict[int, PlayerController] = {}
         self.player_nodes: dict[int, p3d.NodePath] = {}
+        self.projectiles: list[Projectile] = []
 
     def start(self) -> None:
         self.level = Level.create(self.resources['level'])
         self.level.root.reparent_to(self.root_node)
-
 
     def add_new_player(self, connid: int) -> None:
         playerid = connid
@@ -376,6 +439,9 @@ class MainServer(GameState):
                     player_contr = self.player_contrs[playerid]
                     player_contr.move_dir = msg.move_dir
                     player_contr.aim_pos = msg.aim_pos
+
+                    if 'fire' in msg.actions:
+                        self.network.send(SpawnProjectileMsg(playerid), NetRole.SERVER)
                 case _:
                     print(f'Unknown message type: {type(msg)}')
 

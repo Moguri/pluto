@@ -32,6 +32,7 @@ p3d.load_prc_file_data(
     'event-map-item-move-down raw-s\n'
     'event-map-item-move-left raw-a\n'
     'event-map-item-move-right raw-d\n'
+    'event-map-item-fire mouse1\n'
 )
 
 CLIENT_STATES = {

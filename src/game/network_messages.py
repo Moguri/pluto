@@ -16,6 +16,11 @@ class RemovePlayerMsg(NetworkMessage):
 class PlayerInputMsg(NetworkMessage):
     move_dir: Vec2H
     aim_pos: Vec3H
+    actions: list[str]
+
+
+class SpawnProjectileMsg(NetworkMessage):
+    playerid: int
 
 
 class PlayerUpdateMsg(NetworkMessage):
