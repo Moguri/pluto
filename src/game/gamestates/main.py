@@ -4,6 +4,7 @@ from dataclasses import (
     InitVar,
 )
 import math
+import random
 from typing import (
     cast,
     Self,
@@ -147,7 +148,7 @@ class PlayerInput:
 
 @dataclass(kw_only=True)
 class PlayerController:
-    speed: int = 25
+    speed: int = 20
     player_node: p3d.NodePath
     move_dir: p3d.Vec2 = field(init=False, default_factory=p3d.Vec2)
     aim_pos: p3d.Vec3 = field(init=False, default_factory=p3d.Vec3)
@@ -232,6 +233,32 @@ class Projectile:
                 function=end
             )
         ).start()
+
+
+@dataclass(kw_only=True)
+class AiController:
+    playerid: int
+    _accum: float = field(init=False, default=0)
+    move_dir: p3d.Vec2 = field(init=False, default_factory=p3d.Vec2)
+    aim_pos: p3d.Vec3 = field(init=False, default_factory=p3d.Vec3)
+    actions: set[str] = field(init=False, default_factory=set)
+
+    def update(self, dt: float) -> None:
+        self._accum += dt
+        if self._accum > 0.25:
+            if random.random() > 0.5:
+                self.move_dir = p3d.Vec2(
+                    random.random() * 2.0 - 1.0,
+                    random.random() * 2.0 - 1.0
+                ).normalized()
+            else:
+                self.move_dir = p3d.Vec2.zero()
+            self.aim_pos = p3d.Vec3(
+                random.random() * 2.0 - 1.0,
+                random.random() * 2.0 - 1.0,
+                random.random() * 2.0 - 1.0
+            ).normalized()
+            self._accum = 0.0
 
 
 class MainClient(GameState):
@@ -394,6 +421,8 @@ class MainServer(GameState):
     RESOURCES = {
         'level': 'levels/testenv.bam',
     }
+    NUM_BOTS = 1
+    BOT_ID_START = 1000
 
     def __init__(self, base: ShowBase, network: NetworkManager) -> None:
         super().__init__(base)
@@ -403,11 +432,19 @@ class MainServer(GameState):
 
         self.player_contrs: dict[int, PlayerController] = {}
         self.player_nodes: dict[int, p3d.NodePath] = {}
+        self.ai_contrs: dict[int, AiController] = {}
         self.projectiles: list[Projectile] = []
 
     def start(self) -> None:
         self.level = Level.create(self.resources['level'])
         self.level.root.reparent_to(self.root_node)
+
+        for idx in range(self.NUM_BOTS):
+            botid = self.BOT_ID_START + idx
+            self.add_new_player(botid)
+            self.ai_contrs[botid] = AiController(
+                playerid=botid
+            )
 
     def add_new_player(self, connid: int) -> None:
         playerid = connid
@@ -417,9 +454,10 @@ class MainServer(GameState):
             player_node=self.player_nodes[playerid]
         )
 
-        register_player = RegisterPlayerIdMsg(playerid=playerid)
-        register_player.connection_id = connid
-        self.network.send(register_player, NetRole.SERVER)
+        if connid < self.BOT_ID_START:
+            register_player = RegisterPlayerIdMsg(playerid=playerid)
+            register_player.connection_id = connid
+            self.network.send(register_player, NetRole.SERVER)
 
     def remove_player(self, connid: int) -> None:
         playerid = connid
@@ -449,6 +487,12 @@ class MainServer(GameState):
         self.remove_player(conn_id)
 
     def update(self, dt: float) -> None:
+        for playerid, ai_contr in self.ai_contrs.items():
+            ai_contr.update(dt)
+            player_contr = self.player_contrs[playerid]
+            player_contr.move_dir = ai_contr.move_dir
+            player_contr.aim_pos = ai_contr.aim_pos
+
         for playerid, player_contr in self.player_contrs.items():
             player_contr.update(dt)
 
