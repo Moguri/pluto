@@ -29,9 +29,8 @@ from lib.networking import (
 from game.network_messages import (
     PlayerInputMsg,
     PlayerUpdateMsg,
-    RegisterPlayerIdMsg,
-    RemovePlayerMsg,
-    SpawnProjectileMsg,
+    PlayerActionMsg,
+    PlayerAction,
 )
 
 
@@ -46,6 +45,10 @@ class Level:
             i.parent.get_pos()
             for i in model.find_all_matches('**/=type=player_start')
         ]
+
+        # Force to ground plane until there is gravity
+        for starts in player_starts:
+            starts.z = 0
 
         level = cls(
             root=model,
@@ -149,11 +152,53 @@ class PlayerInput:
 @dataclass(kw_only=True)
 class PlayerController:
     speed: int = 20
-    player_node: p3d.NodePath
+    max_health: int = 1
+    playerid: int
+    render_node: InitVar[p3d.NodePath]
+    player_node: p3d.NodePath = field(init=False)
+    alive: bool = field(init=False, default=False)
     move_dir: p3d.Vec2 = field(init=False, default_factory=p3d.Vec2)
     aim_pos: p3d.Vec3 = field(init=False, default_factory=p3d.Vec3)
+    health: int = field(init=False)
+
+    def __post_init__(self, render_node) -> None:
+        self.player_node = render_node.attach_new_node(f'Player {self.playerid}')
+        collider = p3d.CollisionNode('Collider')
+        collider.add_solid(p3d.CollisionSphere(0, 0, 0.5, 0.5))
+        self.player_node.attach_new_node(collider)
+        self.player_node.set_python_tag('contr', self)
+        self.player_node.hide()
+        self.health = self.max_health
+
+    def destroy(self):
+        self.player_node.clear_python_tag('contr')
+        self.player_node.remove_node()
+
+    def spawn(self, spawn_pos: p3d.Vec3) -> None:
+        self.player_node.set_pos(spawn_pos)
+        self.player_node.show()
+        self.health = self.max_health
+        self.alive = True
+
+    def kill(self) -> None:
+        self.player_node.hide()
+        self.alive = False
+
+    def update_move_aim(self, move_dir: p3d.Vec2, aim_pos: p3d.Vec3):
+        if not self.alive:
+            return
+
+        self.move_dir = move_dir
+        self.aim_pos = aim_pos
 
     def update(self, dt: float) -> None:
+        # Check player health
+        if self.health <= 0 and self.alive:
+            self.kill()
+
+        if not self.alive:
+            return
+
         # Update player position
         prevpos = self.player_node.get_pos()
         movedir = p3d.Vec3(self.move_dir.x, self.move_dir.y, 0).normalized()
@@ -198,7 +243,9 @@ class AnimController:
 @dataclass(kw_only=True)
 class Projectile:
     distance: int = 75
-    model: InitVar[p3d.NodePath]
+    damage: int = 1
+    for_player: int
+    model: InitVar[p3d.NodePath | None] = None
     render_node: InitVar[p3d.NodePath]
     player_node: InitVar[p3d.NodePath]
     root: p3d.NodePath = field(init=False)
@@ -211,7 +258,12 @@ class Projectile:
         player_node: p3d.NodePath
     ) -> None:
         self.root = render_node.attach_new_node('Projectile')
-        model.instance_to(self.root)
+        collider = p3d.CollisionNode('Collider')
+        collider.add_solid(p3d.CollisionSphere(0, 0, 0.5, 0.75))
+        self.root.attach_new_node(collider)
+        self.root.set_python_tag('projectile', self)
+        if model:
+            model.instance_to(self.root)
         self.root.hide(p3d.BitMask32.bit(1))
 
         self.root.set_pos_hpr(
@@ -220,6 +272,7 @@ class Projectile:
         )
 
         def end():
+            self.root.clear_python_tag('projectile')
             self.root.remove_node()
             self.is_done = True
 
@@ -300,8 +353,6 @@ class MainClient(GameState):
         self.target_line.set_material(mat)
         self.target_line.hide(p3d.BitMask32.bit(1))
 
-        self.projectiles: list[Projectile] = []
-
         # Ambient lighting
         self.ambient_light = self.root_node.attach_new_node(p3d.AmbientLight('Ambient'))
         ambstr = 0.2
@@ -376,10 +427,21 @@ class MainClient(GameState):
     def handle_messages(self, messages: list[NetworkMessage]) -> None:
         for msg in messages:
             match msg:
-                case RegisterPlayerIdMsg():
-                    self.playerid = msg.playerid
-                case RemovePlayerMsg():
-                    self.remove_player(msg.playerid)
+                case PlayerActionMsg():
+                    if msg.action == PlayerAction.REGISTER:
+                        self.playerid = msg.playerid
+                    elif msg.action == PlayerAction.REMOVE:
+                        self.remove_player(msg.playerid)
+                    elif msg.action == PlayerAction.FIRE:
+                        playerid = msg.playerid
+                        Projectile(
+                            model=self.resources['player'],
+                            for_player=playerid,
+                            player_node=self.player_nodes[playerid],
+                            render_node=self.root_node,
+                        )
+                    else:
+                        print(f'Unknown player action: {msg.action}')
                 case PlayerUpdateMsg():
                     playerid = msg.playerid
                     if playerid not in self.player_nodes:
@@ -388,14 +450,10 @@ class MainClient(GameState):
                         msg.position,
                         msg.hpr
                     )
-                case SpawnProjectileMsg():
-                    playerid = msg.playerid
-                    proj = Projectile(
-                        model=self.resources['player'],
-                        player_node=self.player_nodes[playerid],
-                        render_node=self.root_node,
-                    )
-                    self.projectiles.append(proj)
+                    if msg.alive:
+                        self.player_nodes[playerid].show()
+                    else:
+                        self.player_nodes[playerid].hide()
                 case _:
                     print(f'Unknown message type: {type(msg)}')
 
@@ -430,10 +488,10 @@ class MainServer(GameState):
         self.network = network
         self.level: Level = cast(Level, None)
 
+        self.traverser = p3d.CollisionTraverser('Traverser')
+        self.projectile_collisions = p3d.CollisionHandlerQueue()
         self.player_contrs: dict[int, PlayerController] = {}
-        self.player_nodes: dict[int, p3d.NodePath] = {}
         self.ai_contrs: dict[int, AiController] = {}
-        self.projectiles: list[Projectile] = []
 
     def start(self) -> None:
         self.level = Level.create(self.resources['level'])
@@ -449,23 +507,42 @@ class MainServer(GameState):
     def add_new_player(self, connid: int) -> None:
         playerid = connid
 
-        self.player_nodes[playerid] = self.root_node.attach_new_node(f'Player {playerid}')
         self.player_contrs[playerid] = PlayerController(
-            player_node=self.player_nodes[playerid]
+            playerid=playerid,
+            render_node=self.root_node,
         )
 
         if connid < self.BOT_ID_START:
-            register_player = RegisterPlayerIdMsg(playerid=playerid)
+            register_player = PlayerActionMsg(
+                playerid=playerid,
+                action=PlayerAction.REGISTER
+            )
             register_player.connection_id = connid
             self.network.send(register_player, NetRole.SERVER)
+
+    def spawn_projectile(self, playerid: int) -> None:
+        projectile = Projectile(
+            for_player=playerid,
+            player_node=self.player_contrs[playerid].player_node,
+            render_node=self.root_node,
+        )
+        collpath = projectile.root.find('**/+CollisionNode')
+        self.traverser.add_collider(collpath, self.projectile_collisions)
+        self.network.send(
+            PlayerActionMsg(playerid=playerid, action=PlayerAction.FIRE),
+            NetRole.SERVER
+        )
 
     def remove_player(self, connid: int) -> None:
         playerid = connid
 
-        self.player_nodes[playerid].remove_node()
-        del self.player_nodes[playerid]
+        self.player_contrs[playerid].destroy()
         del self.player_contrs[playerid]
-        self.network.send(RemovePlayerMsg(playerid=playerid), NetRole.CLIENT)
+        msg = PlayerActionMsg(
+            playerid=playerid,
+            action=PlayerAction.REMOVE
+        )
+        self.network.send(msg, NetRole.CLIENT)
 
     def handle_messages(self, messages: list[NetworkMessage]) -> None:
         for msg in messages:
@@ -475,11 +552,11 @@ class MainServer(GameState):
                     if playerid not in self.player_contrs:
                         self.add_new_player(playerid)
                     player_contr = self.player_contrs[playerid]
-                    player_contr.move_dir = msg.move_dir
-                    player_contr.aim_pos = msg.aim_pos
+                    player_contr.update_move_aim(msg.move_dir, msg.aim_pos)
 
-                    if 'fire' in msg.actions:
-                        self.network.send(SpawnProjectileMsg(playerid), NetRole.SERVER)
+                    if player_contr.alive:
+                        if 'fire' in msg.actions:
+                            self.spawn_projectile(playerid)
                 case _:
                     print(f'Unknown message type: {type(msg)}')
 
@@ -487,6 +564,17 @@ class MainServer(GameState):
         self.remove_player(conn_id)
 
     def update(self, dt: float) -> None:
+        self.traverser.traverse(self.root_node)
+
+        for collision in self.projectile_collisions.entries:
+            projectile = collision.get_from_node_path().get_parent().get_python_tag('projectile')
+            player_contr = collision.get_into_node_path().get_parent().get_python_tag('contr')
+
+            if player_contr.playerid == projectile.for_player:
+                continue
+
+            player_contr.health -= projectile.damage
+
         for playerid, ai_contr in self.ai_contrs.items():
             ai_contr.update(dt)
             player_contr = self.player_contrs[playerid]
@@ -494,11 +582,16 @@ class MainServer(GameState):
             player_contr.aim_pos = ai_contr.aim_pos
 
         for playerid, player_contr in self.player_contrs.items():
+            if not player_contr.alive:
+                self.player_contrs[playerid].spawn(
+                    random.choice(self.level.player_starts)
+                )
             player_contr.update(dt)
 
             player_update = PlayerUpdateMsg(
                 playerid=playerid,
                 position=player_contr.player_node.get_pos(),
-                hpr=player_contr.player_node.get_hpr()
+                hpr=player_contr.player_node.get_hpr(),
+                alive=not player_contr.player_node.is_hidden()
             )
             self.network.send(player_update, NetRole.SERVER)

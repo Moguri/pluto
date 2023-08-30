@@ -1,16 +1,15 @@
+import enum
+
 from lib.networking import (
     NetworkMessage,
     Vec2H,
     Vec3H,
 )
 
-
-class RegisterPlayerIdMsg(NetworkMessage):
-    playerid: int
-
-
-class RemovePlayerMsg(NetworkMessage):
-    playerid: int
+class PlayerAction(enum.Enum):
+    REGISTER = 1
+    REMOVE = 2
+    FIRE = 3
 
 
 class PlayerInputMsg(NetworkMessage):
@@ -19,11 +18,13 @@ class PlayerInputMsg(NetworkMessage):
     actions: list[str]
 
 
-class SpawnProjectileMsg(NetworkMessage):
+class PlayerActionMsg(NetworkMessage):
     playerid: int
+    action: PlayerAction
 
 
 class PlayerUpdateMsg(NetworkMessage):
     playerid: int
     position: Vec3H
     hpr: Vec3H
+    alive: bool
