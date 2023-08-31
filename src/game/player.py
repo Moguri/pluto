@@ -23,7 +23,7 @@ class Projectile:
     render_node: InitVar[p3d.NodePath]
     player_node: InitVar[p3d.NodePath]
     root: p3d.NodePath = field(init=False)
-    is_done: bool = field(init=False)
+    is_done: bool = field(init=False, default=False)
 
     def __post_init__(
         self,
@@ -45,11 +45,6 @@ class Projectile:
             player_node.get_hpr()
         )
 
-        def end():
-            self.root.clear_python_tag('projectile')
-            self.root.remove_node()
-            self.is_done = True
-
         Sequence(
             LerpPosInterval(
                 nodePath=self.root,
@@ -57,9 +52,16 @@ class Projectile:
                 pos=render_node.get_relative_point(player_node, (0, -self.distance, 0))
             ),
             FunctionInterval(
-                function=end
+                function=self.destroy
             )
         ).start()
+
+    def destroy(self) -> None:
+        if self.is_done:
+            return
+        self.root.clear_python_tag('projectile')
+        self.root.remove_node()
+        self.is_done = True
 
 
 @dataclass(kw_only=True)

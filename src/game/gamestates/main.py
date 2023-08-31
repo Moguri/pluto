@@ -369,10 +369,14 @@ class MainServer(GameState):
             projectile = collision.get_from_node_path().get_parent().get_python_tag('projectile')
             player_contr = collision.get_into_node_path().get_parent().get_python_tag('contr')
 
+            if projectile is None:
+                continue
+
             if player_contr.playerid == projectile.for_player:
                 continue
 
             player_contr.health -= projectile.damage
+            projectile.destroy()
 
         for playerid, ai_contr in self.ai_contrs.items():
             ai_contr.update(dt)
