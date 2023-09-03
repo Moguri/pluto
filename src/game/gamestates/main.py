@@ -115,7 +115,7 @@ class PlayerInput:
 
 class MainClient(GameState):
     RESOURCES = {
-        'level': 'levels/testenv.bam',
+        'level': 'levels/dungeon_quad.bam',
         'player': 'characters/skeleton.bam',
         'animations': 'animations/animations.bam',
     }
@@ -276,7 +276,7 @@ class MainClient(GameState):
 
 class MainServer(GameState):
     RESOURCES = {
-        'level': 'levels/testenv.bam',
+        'level': 'levels/dungeon_quad.bam',
     }
     NUM_BOTS = 1
     BOT_ID_START = 1000

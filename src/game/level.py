@@ -14,8 +14,17 @@ class Level:
 
     @classmethod
     def create(cls, model: p3d.NodePath) -> Self:
+        zerovec = p3d.Vec3.zero()
+        def get_pos(nodepath: p3d.NodePath):
+            parent = nodepath.parent
+            if (nodepath.get_pos().almost_equal(zerovec)
+                and not isinstance(parent, p3d.ModelRoot)
+                and not parent.get_pos().almost_equal(zerovec)
+            ):
+                return parent.get_pos()
+            return nodepath.get_pos()
         player_starts = [
-            i.parent.get_pos()
+            get_pos(i)
             for i in model.find_all_matches('**/=type=player_start')
         ]
 

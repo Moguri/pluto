@@ -51,6 +51,7 @@ show_all_jobs = true
 
 [tool.pman.blend2bam]
 animations = 'skip'
+textures = 'copy'
 
 [[tool.pman.blend2bam.overrides]]
 pattern = '*animations*'
