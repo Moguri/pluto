@@ -34,6 +34,7 @@ class Projectile:
         self.root = render_node.attach_new_node('Projectile')
         collider = p3d.CollisionNode('Collider')
         collider.add_solid(p3d.CollisionSphere(0, 0, 0.5, 0.75))
+        collider.set_into_collide_mask(0)
         self.root.attach_new_node(collider)
         self.root.set_python_tag('projectile', self)
         if model:

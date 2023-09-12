@@ -197,7 +197,6 @@ class MainClient(GameState):
 
         self.player_model = player
 
-
     def cleanup(self) -> None:
         super().cleanup()
 
@@ -289,6 +288,8 @@ class MainServer(GameState):
 
         self.traverser = p3d.CollisionTraverser('Traverser')
         self.projectile_collisions = p3d.CollisionHandlerQueue()
+        self.player_pusher = p3d.CollisionHandlerPusher()
+        self.player_pusher.horizontal = True
         self.player_contrs: dict[int, PlayerController] = {}
         self.ai_contrs: dict[int, AiController] = {}
 
@@ -310,6 +311,11 @@ class MainServer(GameState):
             playerid=playerid,
             render_node=self.root_node,
         )
+
+        player_node = self.player_contrs[playerid].player_node
+        collpath = player_node.find('**/+CollisionNode')
+        self.player_pusher.add_collider(collpath, player_node)
+        self.traverser.add_collider(collpath, self.player_pusher)
 
         if connid < self.BOT_ID_START:
             register_player = PlayerActionMsg(
@@ -372,10 +378,11 @@ class MainServer(GameState):
             if projectile is None:
                 continue
 
-            if player_contr.playerid == projectile.for_player:
-                continue
+            if player_contr:
+                if player_contr.playerid == projectile.for_player:
+                    continue
 
-            player_contr.health -= projectile.damage
+                player_contr.health -= projectile.damage
             projectile.destroy()
 
         for playerid, ai_contr in self.ai_contrs.items():

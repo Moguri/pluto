@@ -37,10 +37,18 @@ class Level:
             player_starts=player_starts
         )
 
+        # Optimize shadow caster frustum/bounds
         for caster in model.find_all_matches('**/=type=shadow_caster/+Light'):
             caster.node().set_shadow_caster(True, 1024, 1024)
             caster.node().set_camera_mask(p3d.BitMask32.bit(1))
             level.recalc_light_bounds(caster)
+
+        # Reduce extra nodes
+        level.root.flatten_medium()
+
+        # Make sure collision nodes are hidden
+        for colnode in model.find_all_matches('**/+CollisionNode'):
+            colnode.hide()
 
         return level
 
