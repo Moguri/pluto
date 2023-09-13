@@ -7,6 +7,8 @@ from typing import (
 
 import panda3d.core as p3d
 
+from game import config
+
 @dataclass(kw_only=True)
 class Level:
     root: p3d.NodePath
@@ -38,8 +40,9 @@ class Level:
         )
 
         # Optimize shadow caster frustum/bounds
+        shadow_resolution = config.shadow_resolution.value
         for caster in model.find_all_matches('**/=type=shadow_caster/+Light'):
-            caster.node().set_shadow_caster(True, 1024, 1024)
+            caster.node().set_shadow_caster(True, shadow_resolution, shadow_resolution)
             caster.node().set_camera_mask(p3d.BitMask32.bit(1))
             level.recalc_light_bounds(caster)
 

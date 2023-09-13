@@ -119,7 +119,8 @@ class GameApp(ShowBase):
         if netopts['net_role'] != NetRole.SERVER:
             self.set_background_color(0.1, 0.1, 0.1, 1)
             simplepbr.init(
-                enable_shadows=True,
+                enable_shadows=config.enable_shadows.value,
+                msaa_samples=config.msaa_samples.value,
             )
 
         self.disable_mouse()
