@@ -32,6 +32,12 @@ shadow_resolution = p3d.ConfigVariableInt(
     description='Resolution for shadow casting map (powers of two preferred)'
 )
 
+level_name = p3d.ConfigVariableString(
+    name='level-name',
+    default_value='dungeon_quad',
+    description='Name of the level to load',
+)
+
 
 def load():
     p3d.load_prc_file_data(

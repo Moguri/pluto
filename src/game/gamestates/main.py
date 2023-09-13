@@ -23,6 +23,7 @@ from lib.networking import (
 from game.ai import (
     AiController,
 )
+from game import config
 from game.level import (
     Level,
 )
@@ -115,7 +116,6 @@ class PlayerInput:
 
 class MainClient(GameState):
     RESOURCES = {
-        'level': 'levels/dungeon_quad.bam',
         'player': 'characters/skeleton.bam',
         'animations': 'animations/animations.bam',
     }
@@ -126,6 +126,7 @@ class MainClient(GameState):
         self.network = network
         self.level: Level = cast(Level, None)
         self.player_model: p3d.NodePath = cast(p3d.NodePath, None)
+        self.RESOURCES['level'] = f'levels/{config.level_name.value}.bam'
 
         self.root_node.show(p3d.BitMask32.bit(1))
 
@@ -275,7 +276,6 @@ class MainClient(GameState):
 
 class MainServer(GameState):
     RESOURCES = {
-        'level': 'levels/dungeon_quad.bam',
     }
     NUM_BOTS = 1
     BOT_ID_START = 1000
@@ -285,6 +285,7 @@ class MainServer(GameState):
 
         self.network = network
         self.level: Level = cast(Level, None)
+        self.RESOURCES['level'] = f'levels/{config.level_name.value}.bam'
 
         self.traverser = p3d.CollisionTraverser('Traverser')
         self.projectile_collisions = p3d.CollisionHandlerQueue()
