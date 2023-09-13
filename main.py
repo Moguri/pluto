@@ -19,21 +19,8 @@ from lib.networking import (
 )
 
 from game import gamestates
+from game import config
 import game.network_messages
-
-
-p3d.load_prc_file_data(
-    '',
-    'window-title Pluto Game\n'
-    'win-fixed-size true\n'
-    'win-size 1280 720\n'
-    'event-map-item-quit escape q\n'
-    'event-map-item-move-up raw-w\n'
-    'event-map-item-move-down raw-s\n'
-    'event-map-item-move-left raw-a\n'
-    'event-map-item-move-right raw-d\n'
-    'event-map-item-fire mouse1\n'
-)
 
 CLIENT_STATES = {
     'Main': gamestates.MainClient,
@@ -110,6 +97,7 @@ class NetworkGameStateManager:
 
 class GameApp(ShowBase):
     def __init__(self):
+        windowtype = 'onscreen'
         args = sys.argv[1:]
         netopts = {
             'net_role': NetRole.DUAL,
@@ -119,14 +107,14 @@ class GameApp(ShowBase):
                 netopts['net_role'] = NetRole.CLIENT
             elif args[0] == 'host':
                 netopts['net_role'] = NetRole.SERVER
-                p3d.load_prc_file_data('offscreen window', 'window-type none')
+                windowtype = 'none'
         if len(args) > 1:
             netopts['host'] = args[1]
         if len(args) > 2:
             netopts['port'] = args[2]
 
         pman.shim.init(self)
-        ShowBase.__init__(self)
+        ShowBase.__init__(self, windowType=windowtype)
 
         if netopts['net_role'] != NetRole.SERVER:
             self.set_background_color(0.1, 0.1, 0.1, 1)
@@ -159,6 +147,7 @@ class GameApp(ShowBase):
 
 
 def main():
+    config.load()
     app = GameApp()
     app.run()
 
