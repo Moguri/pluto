@@ -38,6 +38,12 @@ level_name = p3d.ConfigVariableString(
     description='Name of the level to load',
 )
 
+num_bots = p3d.ConfigVariableInt(
+    name='num-bots',
+    default_value=1,
+    description='Number of AI players (bots) to load in the game (server only)'
+)
+
 
 def load():
     p3d.load_prc_file_data(

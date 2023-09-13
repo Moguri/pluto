@@ -298,7 +298,7 @@ class MainServer(GameState):
         self.level = Level.create(self.resources['level'])
         self.level.root.reparent_to(self.root_node)
 
-        for idx in range(self.NUM_BOTS):
+        for idx in range(config.num_bots.value):
             botid = self.BOT_ID_START + idx
             self.add_new_player(botid)
             self.ai_contrs[botid] = AiController(
