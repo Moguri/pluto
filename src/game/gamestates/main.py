@@ -179,6 +179,8 @@ class MainClient(GameState):
             angle=45,
             distance=25,
         )
+        self.traverser = p3d.CollisionTraverser('Traverser')
+        self.projectile_collisions = p3d.CollisionHandlerQueue()
 
     def start(self) -> None:
         self.level = Level.create(self.resources['level'])
@@ -233,12 +235,14 @@ class MainClient(GameState):
                         self.remove_player(msg.playerid)
                     elif msg.action == PlayerAction.FIRE:
                         playerid = msg.playerid
-                        Projectile(
+                        projectile = Projectile(
                             model=self.resources['player'],
                             for_player=playerid,
                             player_node=self.player_nodes[playerid],
                             render_node=self.root_node,
                         )
+                        collpath = projectile.root.find('**/+CollisionNode')
+                        self.traverser.add_collider(collpath, self.projectile_collisions)
                     else:
                         print(f'Unknown player action: {msg.action}')
                 case PlayerUpdateMsg():
@@ -253,10 +257,16 @@ class MainClient(GameState):
                         self.player_nodes[playerid].show()
                     else:
                         self.player_nodes[playerid].hide()
+
+                    player_info = self.player_infos[playerid]
+                    player_info.name = msg.name
+                    player_info.kills = msg.kills
+                    player_info.deaths = msg.deaths
                 case _:
                     print(f'Unknown message type: {type(msg)}')
 
     def update(self, dt: float) -> None:
+        self.traverser.traverse(self.root_node)
         if self.playerid is not None and self.playerid in self.player_nodes:
             self.camera_target.set_pos(self.player_nodes[self.playerid].get_pos())
         self.cursor.update()
@@ -264,6 +274,12 @@ class MainClient(GameState):
         self.cam_contr.update(dt)
         for anim_contr in self.anim_contrs.values():
             anim_contr.update()
+
+        for collision in self.projectile_collisions.entries:
+            projectile = collision.get_from_node_path().get_parent().get_python_tag('projectile')
+
+            if projectile:
+                projectile.destroy()
 
         player_update = PlayerInputMsg(
             move_dir=self.player_input.move_dir,
