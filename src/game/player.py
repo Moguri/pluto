@@ -33,7 +33,7 @@ class Projectile:
     ) -> None:
         self.root = render_node.attach_new_node('Projectile')
         collider = p3d.CollisionNode('Collider')
-        collider.add_solid(p3d.CollisionSphere(0, 0, 0.5, 0.75))
+        collider.add_solid(p3d.CollisionSphere(0, 0, 0, 0.25))
         collider.set_into_collide_mask(0)
         self.root.attach_new_node(collider)
         self.root.set_python_tag('projectile', self)
@@ -41,16 +41,12 @@ class Projectile:
             model.instance_to(self.root)
         self.root.hide(p3d.BitMask32.bit(1))
 
-        self.root.set_pos_hpr(
-            player_node.get_pos(),
-            player_node.get_hpr()
-        )
-
         Sequence(
             LerpPosInterval(
                 nodePath=self.root,
                 duration=1.0,
-                pos=render_node.get_relative_point(player_node, (0, -self.distance, 0))
+                pos=render_node.get_relative_point(player_node, (0, -self.distance, 0.5)),
+                startPos=render_node.get_relative_point(player_node, (0, -1.5, 0.5)),
             ),
             FunctionInterval(
                 function=self.destroy

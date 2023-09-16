@@ -121,6 +121,7 @@ class MainClient(GameState):
     RESOURCES = {
         'player': 'characters/skeleton.bam',
         'animations': 'animations/animations.bam',
+        'bullet': 'bullet.bam',
     }
 
     def __init__(self, base: ShowBase, network: NetworkManager):
@@ -231,7 +232,7 @@ class MainClient(GameState):
                     elif msg.action == PlayerAction.FIRE:
                         playerid = msg.playerid
                         projectile = Projectile(
-                            model=self.resources['player'],
+                            model=self.resources['bullet'],
                             for_player=playerid,
                             player_node=self.player_contrs[playerid].player_node,
                             render_node=self.root_node,
