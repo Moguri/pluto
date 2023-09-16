@@ -104,6 +104,7 @@ class PlayerController:
     player_node: p3d.NodePath = field(init=False)
     anim_contr: AnimController | None = field(init=False)
     alive: bool = field(init=False, default=False)
+    firing: bool = field(init=False, default=False)
     move_dir: p3d.Vec2 = field(init=False, default_factory=p3d.Vec2)
     aim_pos: p3d.Vec3 = field(init=False, default_factory=p3d.Vec3)
     health: int = field(init=False)

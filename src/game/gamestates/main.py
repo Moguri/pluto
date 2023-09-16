@@ -98,6 +98,9 @@ class PlayerInput:
             self.move_dir += dir_vec
         def add_action(action: str) -> None:
             self.actions.add(action)
+        def remove_action(action: str) -> None:
+            if action in self.actions:
+                self.actions.remove(action)
         self.events.accept('move-up', move, [p3d.Vec2(0, 1)])
         self.events.accept('move-up-up', move, [p3d.Vec2(0, -1)])
         self.events.accept('move-down', move, [p3d.Vec2(0, -1)])
@@ -107,6 +110,8 @@ class PlayerInput:
         self.events.accept('move-right', move, [p3d.Vec2(1, 0)])
         self.events.accept('move-right-up', move, [p3d.Vec2(-1, 0)])
         self.events.accept('fire', add_action, ['fire'])
+        self.events.accept('fire-repeat', add_action, ['fire'])
+        self.events.accept('fire-up', remove_action, ['fire'])
 
     def update(self) -> None:
         self.aim_pos = self.cursor.get_pos()
@@ -280,7 +285,6 @@ class MainClient(GameState):
             actions=self.player_input.actions,
         )
         self.network.send(player_update, NetRole.CLIENT)
-        self.player_input.actions.clear()
 
 
 class MainServer(GameState):
@@ -368,10 +372,7 @@ class MainServer(GameState):
                         self.add_new_player(playerid)
                     player_contr = self.player_contrs[playerid]
                     player_contr.update_move_aim(msg.move_dir, msg.aim_pos)
-
-                    if player_contr.alive:
-                        if 'fire' in msg.actions:
-                            self.spawn_projectile(playerid)
+                    player_contr.firing = 'fire' in msg.actions
                 case _:
                     print(f'Unknown message type: {type(msg)}')
 
@@ -407,6 +408,8 @@ class MainServer(GameState):
                     random.choice(self.level.player_starts)
                 )
             player_contr.update_server(dt)
+            if player_contr.firing:
+                self.spawn_projectile(player_contr.playerid)
 
             player_update = PlayerUpdateMsg(
                 playerid=playerid,
