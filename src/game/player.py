@@ -97,16 +97,27 @@ class AnimController:
 class PlayerController:
     speed: int = 20
     max_health: int = 1
+
     playerid: int
     render_node: InitVar[p3d.NodePath]
+    character_mesh: InitVar[p3d.NodePath | None] = None
     player_node: p3d.NodePath = field(init=False)
+    anim_contr: AnimController | None = field(init=False)
     alive: bool = field(init=False, default=False)
     move_dir: p3d.Vec2 = field(init=False, default_factory=p3d.Vec2)
     aim_pos: p3d.Vec3 = field(init=False, default_factory=p3d.Vec3)
     health: int = field(init=False)
 
-    def __post_init__(self, render_node) -> None:
+    def __post_init__(self, render_node, character_mesh=None) -> None:
         self.player_node = render_node.attach_new_node(f'Player {self.playerid}')
+        self.anim_contr = None
+        if character_mesh is not None:
+            actor = Actor(character_mesh)
+            actor.reparent_to(self.player_node)
+            self.anim_contr = AnimController(
+                player_node=self.player_node,
+                actor=actor,
+            )
         collider = p3d.CollisionNode('Collider')
         collider.add_solid(p3d.CollisionSphere(0, 0, 0.5, 0.5))
         self.player_node.attach_new_node(collider)
@@ -135,7 +146,10 @@ class PlayerController:
         self.move_dir = move_dir
         self.aim_pos = aim_pos
 
-    def update(self, dt: float) -> None:
+    def set_pos_hpr(self, pos: p3d.Vec3, hpr: p3d.Vec3):
+        return self.player_node.set_pos_hpr(pos, hpr)
+
+    def update_server(self, dt: float) -> None:
         # Check player health
         if self.health <= 0 and self.alive:
             self.kill()
@@ -154,3 +168,7 @@ class PlayerController:
 
         # Character models are facing -Y, so flip them around now
         self.player_node.set_h(self.player_node.get_h() - 180)
+
+    def update_client(self, _dt: float) -> None:
+        if self.anim_contr:
+            self.anim_contr.update()

@@ -11,7 +11,6 @@ from typing import (
 import panda3d.core as p3d
 from direct.showbase.ShowBase import ShowBase
 from direct.showbase.DirectObject import DirectObject
-from direct.actor.Actor import Actor
 
 from lib.gamestates import GameState
 from lib.networking import (
@@ -34,7 +33,6 @@ from game.network_messages import (
     PlayerAction,
 )
 from game.player import (
-    AnimController,
     PlayerController,
     Projectile,
 )
@@ -162,8 +160,7 @@ class MainClient(GameState):
 
         self.camera_target = self.root_node.attach_new_node('Camera Target')
         self.playerid: int | None = None
-        self.player_nodes: dict[int, p3d.NodePath] = {}
-        self.anim_contrs: dict[int, AnimController] = {}
+        self.player_contrs: dict[int, PlayerController] = {}
         self.cursor = CursorInput(
             mouse_watcher=base.mouseWatcherNode,
             camera_node=base.cam,
@@ -206,24 +203,17 @@ class MainClient(GameState):
         self.window.request_properties(self.prev_win_props)
 
     def add_new_player(self, playerid: int) -> None:
-        player_node = self.root_node.attach_new_node(f'Player {playerid}')
-        if self.player_model:
-            actor = Actor(self.player_model)
-            actor.reparent_to(player_node)
-            anim_contr = AnimController(
-                player_node=player_node,
-                actor=actor,
-            )
-            self.anim_contrs[playerid] = anim_contr
-
-        self.player_nodes[playerid] = player_node
+        self.player_contrs[playerid] = PlayerController(
+            playerid=playerid,
+            render_node=self.root_node,
+            character_mesh=self.player_model,
+        )
         if playerid == self.playerid:
-            self.target_line.reparent_to(player_node)
+            self.target_line.reparent_to(self.player_contrs[playerid].player_node)
 
     def remove_player(self, playerid: int) -> None:
-        self.player_nodes[playerid].remove_node()
-        del self.player_nodes[playerid]
-        del self.anim_contrs[playerid]
+        self.player_contrs[playerid].destroy()
+        del self.player_contrs[playerid]
 
     def handle_messages(self, messages: list[NetworkMessage]) -> None:
         for msg in messages:
@@ -238,7 +228,7 @@ class MainClient(GameState):
                         projectile = Projectile(
                             model=self.resources['player'],
                             for_player=playerid,
-                            player_node=self.player_nodes[playerid],
+                            player_node=self.player_contrs[playerid].player_node,
                             render_node=self.root_node,
                         )
                         collpath = projectile.root.find('**/+CollisionNode')
@@ -247,39 +237,42 @@ class MainClient(GameState):
                         print(f'Unknown player action: {msg.action}')
                 case PlayerUpdateMsg():
                     playerid = msg.playerid
-                    if playerid not in self.player_nodes:
+                    if playerid not in self.player_contrs:
                         self.add_new_player(playerid)
-                    self.player_nodes[playerid].set_pos_hpr(
+                    player_contr = self.player_contrs[playerid]
+                    if msg.alive and not player_contr.alive:
+                        player_contr.spawn(p3d.Vec3(0, 0, 0))
+                    elif not msg.alive and player_contr.alive:
+                        player_contr.kill()
+                    player_contr.set_pos_hpr(
                         msg.position,
                         msg.hpr
                     )
-                    if msg.alive:
-                        self.player_nodes[playerid].show()
-                    else:
-                        self.player_nodes[playerid].hide()
-
-                    player_info = self.player_infos[playerid]
-                    player_info.name = msg.name
-                    player_info.kills = msg.kills
-                    player_info.deaths = msg.deaths
                 case _:
                     print(f'Unknown message type: {type(msg)}')
 
     def update(self, dt: float) -> None:
         self.traverser.traverse(self.root_node)
-        if self.playerid is not None and self.playerid in self.player_nodes:
-            self.camera_target.set_pos(self.player_nodes[self.playerid].get_pos())
+        if self.playerid is not None and self.playerid in self.player_contrs:
+            self.camera_target.set_pos(self.player_contrs[self.playerid].player_node.get_pos())
         self.cursor.update()
         self.player_input.update()
         self.cam_contr.update(dt)
-        for anim_contr in self.anim_contrs.values():
-            anim_contr.update()
+        for player_contr in self.player_contrs.values():
+            player_contr.update_client(dt)
 
         for collision in self.projectile_collisions.entries:
             projectile = collision.get_from_node_path().get_parent().get_python_tag('projectile')
+            player_contr = collision.get_into_node_path().get_parent().get_python_tag('contr')
 
-            if projectile:
-                projectile.destroy()
+            if projectile is None:
+                continue
+
+            if player_contr:
+                if player_contr.playerid == projectile.for_player:
+                    continue
+
+            projectile.destroy()
 
         player_update = PlayerInputMsg(
             move_dir=self.player_input.move_dir,
@@ -413,7 +406,7 @@ class MainServer(GameState):
                 self.player_contrs[playerid].spawn(
                     random.choice(self.level.player_starts)
                 )
-            player_contr.update(dt)
+            player_contr.update_server(dt)
 
             player_update = PlayerUpdateMsg(
                 playerid=playerid,
